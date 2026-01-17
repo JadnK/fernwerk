@@ -1,4 +1,5 @@
 mod error;
+mod ssh;
 mod state;
 mod vault;
 
@@ -23,6 +24,10 @@ pub fn run() {
             vault::snippet_save,
             vault::snippet_delete,
             vault::settings_save,
+            // SSH
+            ssh::ssh_connect,
+            ssh::ssh_disconnect,
+            ssh::ssh_exec,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");
