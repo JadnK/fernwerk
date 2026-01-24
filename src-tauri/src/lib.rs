@@ -1,6 +1,7 @@
 mod error;
 mod ssh;
 mod state;
+mod terminal;
 mod vault;
 
 use tauri::Manager;
@@ -28,6 +29,11 @@ pub fn run() {
             ssh::ssh_connect,
             ssh::ssh_disconnect,
             ssh::ssh_exec,
+            // Terminal
+            terminal::term_open,
+            terminal::term_write,
+            terminal::term_resize,
+            terminal::term_close,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");
