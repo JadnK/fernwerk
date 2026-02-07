@@ -169,6 +169,18 @@ export function TerminalPane({
     });
     ro.observe(hostRef.current!);
 
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault();
+      const sel = term.getSelection();
+      if (sel) {
+        navigator.clipboard.writeText(sel);
+        term.clearSelection();
+      } else {
+        navigator.clipboard.readText().then((t) => t && send(t));
+      }
+    };
+    hostRef.current!.addEventListener("contextmenu", onContext);
+
     return () => {
       disposed = true;
       ro.disconnect();
