@@ -1,0 +1,112 @@
+import { useState } from "react";
+import {
+  Activity,
+  Plus,
+  RotateCw,
+  SquareTerminal,
+  WifiOff,
+  X,
+} from "lucide-react";
+import { useStore, type Session } from "../lib/store";
+import type { Tool } from "../lib/types";
+import { TerminalPane } from "./TerminalPane";
+
+export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: string }[] = [
+  { id: "terminal", label: "Terminal", icon: SquareTerminal, key: "1" },
+];
+
+export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
+  const settings = useStore((s) => s.vault?.settings);
+  const { setTool, addTerminal, closeTerminal, updateSession, reconnect } = useStore.getState();
+  const [titles, setTitles] = useState<Record<string, string>>({});
+
+  if (!settings) return null;
+  const closed = session.status === "closed";
+  const show = (t: Tool) => visible && session.tool === t;
+
+  return (
+    <div className="session" style={{ display: visible ? "flex" : "none" }}>
+      <div className="toolbar">
+        <div className="tools">
+          {TOOLS.map((t) => (
+            <button
+              key={t.id}
+              className={`tool ${session.tool === t.id ? "on" : ""}`}
+              onClick={() => setTool(session.id, t.id)}
+              title={`${t.label} (Strg+${t.key})`}
+            >
+              <t.icon size={15} />
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <span className="session-meta">
+          {session.username}@{session.host}
+        </span>
+      </div>
+
+      {closed && (
+        <div className="closed-banner">
+          <WifiOff size={15} />
+          <span className="grow">Verbindung getrennt.</span>
+          <button className="btn sm" onClick={() => reconnect(session.id)}>
+            <RotateCw size={13} /> Neu verbinden
+          </button>
+        </div>
+      )}
+
+      {/* Terminal */}
+      <div className={`pane ${show("terminal") ? "" : "hidden"}`}>
+        <div className="term-tabs">
+          {session.terminals.map((t) => (
+            <div
+              key={t.key}
+              className={`term-tab ${session.activeTerm === t.key ? "on" : ""}`}
+              onClick={() => updateSession(session.id, { activeTerm: t.key })}
+              onAuxClick={(e) => e.button === 1 && closeTerminal(session.id, t.key)}
+            >
+              <span className="ellipsis">{titles[t.key] || t.title}</span>
+              <button
+                className="btn sm icon ghost"
+                style={{ width: 18, height: 18 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTerminal(session.id, t.key);
+                }}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          <button
+            className="btn sm icon ghost"
+            title="Neue Shell (Strg+Shift+T)"
+            disabled={closed}
+            onClick={() => addTerminal(session.id)}
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+        {session.terminals.length === 0 && (
+          <div className="empty">
+            <button className="btn" disabled={closed} onClick={() => addTerminal(session.id)}>
+              <Plus size={14} /> Neue Shell öffnen
+            </button>
+          </div>
+        )}
+        {!closed &&
+          session.terminals.map((t) => (
+            <TerminalPane
+              key={t.key}
+              connId={session.id}
+              tab={t}
+              settings={settings}
+              visible={show("terminal") && session.activeTerm === t.key}
+              onTitle={(title) => setTitles((x) => ({ ...x, [t.key]: title }))}
+            />
+          ))}
+      </div>
+
+    </div>
+  );
+}
