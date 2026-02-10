@@ -307,6 +307,11 @@ export async function withSudo<T>(sessionId: string, fn: (pw: string | undefined
   throw new Error("sudo fehlgeschlagen");
 }
 
+/** Wie run(), liefert aber true/false – für Aktionen ohne Rückgabewert. */
+export async function attempt(fn: () => Promise<unknown>, okText?: string): Promise<boolean> {
+  return (await run(async () => (await fn(), true), okText)) === true;
+}
+
 /** Wrapper für Aktionen mit Fehler-Toast. */
 export async function run<T>(fn: () => Promise<T>, okText?: string): Promise<T | undefined> {
   try {

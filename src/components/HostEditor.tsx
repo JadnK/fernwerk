@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, KeyRound, Lock } from "lucide-react";
 import { api } from "../lib/api";
-import { confirm, run, useStore } from "../lib/store";
+import { attempt, confirm, run, useStore } from "../lib/store";
 import type { HostProfile } from "../lib/types";
 import { Field, Modal } from "./ui";
 
@@ -46,12 +46,12 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
     let secret: { password?: string; passphrase?: string } | undefined;
     if (clearSecret) secret = { password: "", passphrase: "" };
     else if (password || passphrase) secret = { password: password || undefined, passphrase: passphrase || undefined };
-    const ok = await run(async () => {
+    const ok = await attempt(async () => {
       await api.hostSave(profile, secret);
       await reloadVault();
     }, host ? "Host gespeichert" : "Host angelegt");
     setBusy(false);
-    if (ok !== undefined) onClose();
+    if (ok) onClose();
   };
 
   const remove = async () => {
