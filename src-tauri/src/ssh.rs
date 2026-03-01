@@ -1,12 +1,14 @@
 //! SSH-Verbindungen: Aufbau, Host-Key-Prüfung (TOFU), Exec- und Sudo-Helfer.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
 use russh::client::{self, Handle, Msg};
 use russh::keys::{load_secret_key, HashAlg, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
 use russh::{ChannelMsg, ChannelWriteHalf, Disconnect};
+use russh_sftp::client::SftpSession;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
@@ -56,6 +58,8 @@ pub struct Connection {
     pub handle: Handle<Client>,
     login_password: Option<String>,
     pub terminals: Mutex<HashMap<String, ChannelWriteHalf<Msg>>>,
+    pub sftp: Mutex<Option<Arc<SftpSession>>>,
+    pub cancels: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
 #[derive(Debug, Default)]
@@ -91,6 +95,23 @@ impl Connection {
             stdout: String::from_utf8_lossy(&out).into_owned(),
             stderr: String::from_utf8_lossy(&err).into_owned(),
         })
+    }
+
+    pub async fn sftp(&self) -> AppResult<Arc<SftpSession>> {
+        let mut guard = self.sftp.lock().await;
+        if let Some(s) = guard.as_ref() {
+            return Ok(s.clone());
+        }
+        let ch = self.handle.channel_open_session().await?;
+        ch.request_subsystem(true, "sftp").await?;
+        let session = Arc::new(SftpSession::new(ch.into_stream()).await?);
+        *guard = Some(session.clone());
+        Ok(session)
+    }
+
+    /// Verwirft die SFTP-Session, damit sie beim nächsten Zugriff neu aufgebaut wird.
+    pub async fn reset_sftp(&self) {
+        *self.sftp.lock().await = None;
     }
 }
 
@@ -235,6 +256,8 @@ pub async fn ssh_connect(
         handle,
         login_password,
         terminals: Mutex::new(HashMap::new()),
+        sftp: Mutex::new(None),
+        cancels: std::sync::Mutex::new(HashMap::new()),
     });
     state.conns.write().await.insert(id.clone(), conn.clone());
 
