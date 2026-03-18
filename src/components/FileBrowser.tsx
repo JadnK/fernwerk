@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Channel } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   ArrowUp,
@@ -50,6 +51,7 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
   const [filter, setFilter] = useState("");
   const [editingPath, setEditingPath] = useState(false);
   const [pathInput, setPathInput] = useState("");
+  const [dragging, setDragging] = useState(false);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [editor, setEditor] = useState<{ path: string; content: string; original: string } | null>(null);
   const lastClicked = useRef<number>(-1);
@@ -138,6 +140,25 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
     const label = paths.length === 1 ? paths[0].split("/").pop()! : `${paths.length} Elemente`;
     await startTransfer("down", label, (id, ch) => api.sftpDownload(connId, paths, dest, id, ch));
   };
+
+  // Drag & Drop aus dem Dateimanager
+  useEffect(() => {
+    if (!visible) return;
+    let unlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent((ev) => {
+        const p = ev.payload;
+        if (p.type === "enter" || p.type === "over") setDragging(true);
+        else if (p.type === "leave") setDragging(false);
+        else if (p.type === "drop") {
+          setDragging(false);
+          upload(p.paths);
+        }
+      })
+      .then((u) => (unlisten = u));
+    return () => unlisten?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, path, connId]);
 
   // ------------------------------------------------------------ Aktionen
 
@@ -331,6 +352,7 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
       </div>
 
       <div className="file-list">
+        {dragging && <div className="dropzone">Loslassen zum Hochladen nach {path}</div>}
         {error ? (
           <div className="empty">
             <div className="err">{error}</div>
