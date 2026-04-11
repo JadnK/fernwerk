@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity,
+  FolderTree,
   Plus,
   RotateCw,
   SquareTerminal,
@@ -9,16 +10,23 @@ import {
 } from "lucide-react";
 import { useStore, type Session } from "../lib/store";
 import type { Tool } from "../lib/types";
+import { FileBrowser } from "./FileBrowser";
 import { TerminalPane } from "./TerminalPane";
 
 export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: string }[] = [
   { id: "terminal", label: "Terminal", icon: SquareTerminal, key: "1" },
+  { id: "files", label: "Dateien", icon: FolderTree, key: "2" },
 ];
 
 export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
   const settings = useStore((s) => s.vault?.settings);
   const { setTool, addTerminal, closeTerminal, updateSession, reconnect } = useStore.getState();
+  const [mounted, setMounted] = useState<Set<Tool>>(new Set(["terminal"]));
   const [titles, setTitles] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setMounted((m) => (m.has(session.tool) ? m : new Set(m).add(session.tool)));
+  }, [session.tool]);
 
   if (!settings) return null;
   const closed = session.status === "closed";
@@ -107,6 +115,15 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           ))}
       </div>
 
+      {!closed && (
+        <>
+          {mounted.has("files") && (
+            <div className={`pane ${show("files") ? "" : "hidden"}`}>
+              <FileBrowser connId={session.id} visible={show("files")} />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

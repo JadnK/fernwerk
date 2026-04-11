@@ -12,6 +12,12 @@ Läuft auf Windows, macOS und Linux.
 - Snippets: häufige Befehle speichern und per Klick oder `Strg+K` ausführen
 - Startbefehl pro Host (z.B. `cd /var/www && git status`)
 
+**Dateien (SFTP)**
+- Dateibrowser mit Mehrfachauswahl, Filter, versteckten Dateien
+- Upload/Download von Dateien *und* Ordnern (rekursiv), mit Fortschritt und Abbrechen
+- Drag & Drop aus dem Dateimanager
+- Dateien direkt bearbeiten (bis 5 MB), Rechte setzen, umbenennen, löschen
+
 **Sicherheit**
 - Host-Key-Prüfung (Trust on first use), Warnung bei geändertem Fingerprint
 - Passwörter und Passphrasen lokal mit ChaCha20-Poly1305 verschlüsselt

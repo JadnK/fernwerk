@@ -445,6 +445,7 @@ input, textarea, select, button { font: inherit; color: inherit; }
 }
 .modal.wide { width: min(860px, calc(100vw - 40px)); }
 .modal.full { width: calc(100vw - 80px); height: calc(100vh - 80px); }
+.modal.full .modal-body { flex: 1; min-height: 0; }
 .modal-head { padding: 14px 16px 6px; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 10px; }
 .modal-body { padding: 8px 16px 14px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
 .modal-foot { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }

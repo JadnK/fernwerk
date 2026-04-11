@@ -1,4 +1,5 @@
 mod error;
+mod sftp;
 mod ssh;
 mod state;
 mod terminal;
@@ -34,6 +35,19 @@ pub fn run() {
             terminal::term_write,
             terminal::term_resize,
             terminal::term_close,
+            // SFTP
+            sftp::sftp_home,
+            sftp::sftp_list,
+            sftp::sftp_mkdir,
+            sftp::sftp_touch,
+            sftp::sftp_rename,
+            sftp::sftp_chmod,
+            sftp::sftp_remove,
+            sftp::sftp_read_text,
+            sftp::sftp_write_text,
+            sftp::sftp_download,
+            sftp::sftp_upload,
+            sftp::sftp_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");
