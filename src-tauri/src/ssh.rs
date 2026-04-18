@@ -59,6 +59,7 @@ pub struct Connection {
     login_password: Option<String>,
     pub terminals: Mutex<HashMap<String, ChannelWriteHalf<Msg>>>,
     pub sftp: Mutex<Option<Arc<SftpSession>>>,
+    pub stats_prev: Mutex<Option<crate::stats::Sample>>,
     pub cancels: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
@@ -113,6 +114,11 @@ impl Connection {
     pub async fn reset_sftp(&self) {
         *self.sftp.lock().await = None;
     }
+}
+
+/// POSIX-sicheres Quoting für Shell-Argumente.
+pub fn sh_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
 }
 
 // ---------------------------------------------------------------- Connect
@@ -257,6 +263,7 @@ pub async fn ssh_connect(
         login_password,
         terminals: Mutex::new(HashMap::new()),
         sftp: Mutex::new(None),
+        stats_prev: Mutex::new(None),
         cancels: std::sync::Mutex::new(HashMap::new()),
     });
     state.conns.write().await.insert(id.clone(), conn.clone());

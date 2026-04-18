@@ -18,6 +18,11 @@ Läuft auf Windows, macOS und Linux.
 - Drag & Drop aus dem Dateimanager
 - Dateien direkt bearbeiten (bis 5 MB), Rechte setzen, umbenennen, löschen
 
+**Monitor**
+- CPU, RAM, Swap, Load, Netzwerk-Durchsatz live mit Verlauf
+- Datenträger-Belegung
+- Top-Prozesse mit Beenden (`TERM`/`KILL`)
+
 **Sicherheit**
 - Host-Key-Prüfung (Trust on first use), Warnung bei geändertem Fingerprint
 - Passwörter und Passphrasen lokal mit ChaCha20-Poly1305 verschlüsselt
