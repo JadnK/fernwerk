@@ -11,11 +11,13 @@ import {
 import { useStore, type Session } from "../lib/store";
 import type { Tool } from "../lib/types";
 import { FileBrowser } from "./FileBrowser";
+import { Monitor } from "./Monitor";
 import { TerminalPane } from "./TerminalPane";
 
 export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: string }[] = [
   { id: "terminal", label: "Terminal", icon: SquareTerminal, key: "1" },
   { id: "files", label: "Dateien", icon: FolderTree, key: "2" },
+  { id: "monitor", label: "Monitor", icon: Activity, key: "3" },
 ];
 
 export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
@@ -120,6 +122,11 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           {mounted.has("files") && (
             <div className={`pane ${show("files") ? "" : "hidden"}`}>
               <FileBrowser connId={session.id} visible={show("files")} />
+            </div>
+          )}
+          {mounted.has("monitor") && (
+            <div className={`pane ${show("monitor") ? "" : "hidden"}`}>
+              <Monitor sessionId={session.id} connId={session.id} visible={show("monitor")} />
             </div>
           )}
         </>
