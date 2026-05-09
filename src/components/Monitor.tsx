@@ -194,7 +194,7 @@ export function Monitor({ sessionId, connId, visible }: { sessionId: string; con
                   <span className={`mono ${p > 90 ? "err" : p > 75 ? "warn" : "muted"}`}>{pct(p)}</span>
                 </div>
                 <Bar value={p} />
-                <div className="dim mono" style={{ fontSize: 11 }}>
+                <div className="dim mono ellipsis" style={{ fontSize: 11 }} title={d.fs}>
                   {bytes(d.used)} / {bytes(d.size)} · {d.fs}
                 </div>
               </div>
