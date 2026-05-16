@@ -279,3 +279,35 @@ pub async fn process_kill(
     conn.exec_root(&cmd, sudo_password, None).await?.check()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cpu_line() {
+        let (t, i) = parse_cpu("cpu  100 0 50 800 50 0 0 0 0 0");
+        assert_eq!(t, 1000);
+        assert_eq!(i, 850);
+    }
+
+    #[test]
+    fn meminfo() {
+        let m = parse_meminfo("MemTotal:  1000 kB\nMemFree: 100 kB\nMemAvailable: 400 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n");
+        assert_eq!(m.total, 1000 * 1024);
+        assert_eq!(m.used, 600 * 1024);
+    }
+
+    #[test]
+    fn df() {
+        let d = parse_df("Filesystem 1-blocks Used Available Capacity Mounted on\n/dev/sda1 1000 400 600 40% /\n");
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].mount, "/");
+    }
+
+    #[test]
+    fn net() {
+        let s = "Inter-|   Receive\n face |bytes\n    lo: 10 0 0 0 0 0 0 0 10 0 0 0 0 0 0 0\n  eth0: 500 1 0 0 0 0 0 0 300 2 0 0 0 0 0 0\n";
+        assert_eq!(parse_net(s), (500, 300));
+    }
+}
