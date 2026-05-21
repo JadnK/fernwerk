@@ -452,6 +452,8 @@ input, textarea, select, button { font: inherit; color: inherit; }
 .detail { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; white-space: pre-wrap; word-break: break-all; }
 
 @keyframes fade { from { opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.9s linear infinite; }
 .btn.on { background: var(--panel-3); color: var(--text); }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
