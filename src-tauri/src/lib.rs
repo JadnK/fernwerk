@@ -2,6 +2,7 @@ mod error;
 mod sftp;
 mod ssh;
 mod state;
+mod stats;
 mod terminal;
 mod vault;
 
@@ -48,6 +49,9 @@ pub fn run() {
             sftp::sftp_download,
             sftp::sftp_upload,
             sftp::sftp_cancel,
+            // Monitoring
+            stats::stats_fetch,
+            stats::process_kill,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");

@@ -11,7 +11,7 @@ use russh::{ChannelMsg, ChannelWriteHalf, Disconnect};
 use russh_sftp::client::SftpSession;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, OnceCell};
 
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -57,8 +57,10 @@ pub struct Connection {
     pub username: String,
     pub handle: Handle<Client>,
     login_password: Option<String>,
+    sudo_nopass: OnceCell<bool>,
     pub terminals: Mutex<HashMap<String, ChannelWriteHalf<Msg>>>,
     pub sftp: Mutex<Option<Arc<SftpSession>>>,
+    pub stats_prev: Mutex<Option<crate::stats::Sample>>,
     pub cancels: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
@@ -67,6 +69,32 @@ pub struct ExecOutput {
     pub code: Option<u32>,
     pub stdout: String,
     pub stderr: String,
+}
+
+impl ExecOutput {
+    pub fn ok(&self) -> bool {
+        self.code == Some(0)
+    }
+
+    /// Fehler mit stderr, falls der Exit-Code nicht 0 ist.
+    pub fn check(self) -> AppResult<Self> {
+        if self.ok() {
+            Ok(self)
+        } else {
+            let msg = if self.stderr.trim().is_empty() {
+                self.stdout.trim()
+            } else {
+                self.stderr.trim()
+            };
+            Err(AppError::msg(format!(
+                "Befehl fehlgeschlagen (Exit {}): {}",
+                self.code
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "?".into()),
+                msg
+            )))
+        }
+    }
 }
 
 impl Connection {
@@ -97,6 +125,54 @@ impl Connection {
         })
     }
 
+    /// Führt `cmd` als root aus. Nutzt sudo ohne Passwort, wenn möglich,
+    /// sonst das übergebene bzw. beim Login verwendete Passwort.
+    pub async fn exec_root(
+        &self,
+        cmd: &str,
+        sudo_password: Option<String>,
+        stdin: Option<&[u8]>,
+    ) -> AppResult<ExecOutput> {
+        if self.username == "root" {
+            return self.exec(&format!("sh -c {}", sh_quote(cmd)), stdin).await;
+        }
+
+        let nopass = *self
+            .sudo_nopass
+            .get_or_init(|| async {
+                self.exec("sudo -n true", None)
+                    .await
+                    .map(|o| o.ok())
+                    .unwrap_or(false)
+            })
+            .await;
+
+        if nopass {
+            return self
+                .exec(&format!("sudo -n sh -c {}", sh_quote(cmd)), stdin)
+                .await;
+        }
+
+        let pw = sudo_password
+            .filter(|p| !p.is_empty())
+            .or_else(|| self.login_password.clone())
+            .ok_or_else(|| AppError::msg("SUDO_PASSWORD_REQUIRED"))?;
+        let mut input = format!("{pw}\n").into_bytes();
+        if let Some(extra) = stdin {
+            input.extend_from_slice(extra);
+        }
+        let out = self
+            .exec(
+                &format!("sudo -S -p '' sh -c {}", sh_quote(cmd)),
+                Some(&input),
+            )
+            .await?;
+        if out.stderr.contains("incorrect password") || out.stderr.contains("Sorry, try again") {
+            return Err(AppError::msg("SUDO_PASSWORD_WRONG"));
+        }
+        Ok(out)
+    }
+
     pub async fn sftp(&self) -> AppResult<Arc<SftpSession>> {
         let mut guard = self.sftp.lock().await;
         if let Some(s) = guard.as_ref() {
@@ -113,6 +189,11 @@ impl Connection {
     pub async fn reset_sftp(&self) {
         *self.sftp.lock().await = None;
     }
+}
+
+/// POSIX-sicheres Quoting für Shell-Argumente.
+pub fn sh_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
 }
 
 // ---------------------------------------------------------------- Connect
@@ -255,8 +336,10 @@ pub async fn ssh_connect(
         username: profile.username.clone(),
         handle,
         login_password,
+        sudo_nopass: OnceCell::new(),
         terminals: Mutex::new(HashMap::new()),
         sftp: Mutex::new(None),
+        stats_prev: Mutex::new(None),
         cancels: std::sync::Mutex::new(HashMap::new()),
     });
     state.conns.write().await.insert(id.clone(), conn.clone());
