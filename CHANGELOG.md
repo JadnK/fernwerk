@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 – 2026-05-31
+
+- Monitor: CPU, RAM, Swap, Load, Netzwerk mit Verlauf
+- Datenträger und Top-Prozesse, Prozesse beenden
+
 ## 0.2.0 – 2026-04-12
 
 - SFTP-Dateibrowser mit Upload/Download, auch rekursiv
