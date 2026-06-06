@@ -373,6 +373,7 @@ pub async fn ssh_connect(
 
 #[tauri::command]
 pub async fn ssh_disconnect(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    crate::tunnels::stop_for_connection(&state, &id).await;
     if let Some(conn) = state.conns.write().await.remove(&id) {
         let _ = conn
             .handle

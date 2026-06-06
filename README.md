@@ -23,6 +23,12 @@ Läuft auf Windows, macOS und Linux.
 - Datenträger-Belegung
 - Top-Prozesse mit Beenden (`TERM`/`KILL`)
 
+**Tunnel**
+- Local Forward (`-L`) und SOCKS5-Proxy (`-D`)
+- Pro Host gespeichert, optional Autostart beim Verbinden
+- Liste der lauschenden Server-Ports mit Ein-Klick-Weiterleitung
+- Live-Statistik: offene Verbindungen, übertragene Bytes
+
 **Sicherheit**
 - Host-Key-Prüfung (Trust on first use), Warnung bei geändertem Fingerprint
 - Passwörter und Passphrasen lokal mit ChaCha20-Poly1305 verschlüsselt
