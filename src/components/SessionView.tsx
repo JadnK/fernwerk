@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity,
+  ArrowRightLeft,
   FolderTree,
   Plus,
   RotateCw,
@@ -13,11 +14,13 @@ import type { Tool } from "../lib/types";
 import { FileBrowser } from "./FileBrowser";
 import { Monitor } from "./Monitor";
 import { TerminalPane } from "./TerminalPane";
+import { Tunnels } from "./Tunnels";
 
 export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: string }[] = [
   { id: "terminal", label: "Terminal", icon: SquareTerminal, key: "1" },
   { id: "files", label: "Dateien", icon: FolderTree, key: "2" },
   { id: "monitor", label: "Monitor", icon: Activity, key: "3" },
+  { id: "tunnels", label: "Tunnel", icon: ArrowRightLeft, key: "5" },
 ];
 
 export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
@@ -127,6 +130,11 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           {mounted.has("monitor") && (
             <div className={`pane ${show("monitor") ? "" : "hidden"}`}>
               <Monitor sessionId={session.id} connId={session.id} visible={show("monitor")} />
+            </div>
+          )}
+          {mounted.has("tunnels") && (
+            <div className={`pane ${show("tunnels") ? "" : "hidden"}`}>
+              <Tunnels connId={session.id} hostId={session.hostId} visible={show("tunnels")} />
             </div>
           )}
         </>
