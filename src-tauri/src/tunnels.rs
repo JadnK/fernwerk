@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::State;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 
@@ -48,9 +48,41 @@ pub struct TunnelStatus {
     pub started: i64,
 }
 
+/// Kopiert in beide Richtungen und zählt die Bytes live mit.
+async fn relay<A, B>(a: A, b: B, stats: &TunnelStats)
+where
+    A: AsyncRead + AsyncWrite + Unpin,
+    B: AsyncRead + AsyncWrite + Unpin,
+{
+    let (mut ar, mut aw) = tokio::io::split(a);
+    let (mut br, mut bw) = tokio::io::split(b);
+
+    let up = async {
+        let mut buf = vec![0u8; 32 * 1024];
+        while let Ok(n) = ar.read(&mut buf).await {
+            if n == 0 || bw.write_all(&buf[..n]).await.is_err() {
+                break;
+            }
+            stats.up.fetch_add(n as u64, Ordering::Relaxed);
+        }
+        let _ = bw.shutdown().await;
+    };
+    let down = async {
+        let mut buf = vec![0u8; 32 * 1024];
+        while let Ok(n) = br.read(&mut buf).await {
+            if n == 0 || aw.write_all(&buf[..n]).await.is_err() {
+                break;
+            }
+            stats.down.fetch_add(n as u64, Ordering::Relaxed);
+        }
+        let _ = aw.shutdown().await;
+    };
+    tokio::join!(up, down);
+}
+
 async fn pipe(
     conn: Arc<Connection>,
-    mut tcp: TcpStream,
+    tcp: TcpStream,
     host: String,
     port: u16,
     stats: Arc<TunnelStats>,
@@ -67,13 +99,9 @@ async fn pipe(
         Ok(c) => c,
         Err(_) => return,
     };
-    let mut stream = ch.into_stream();
     stats.active.fetch_add(1, Ordering::Relaxed);
     stats.total.fetch_add(1, Ordering::Relaxed);
-    if let Ok((up, down)) = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await {
-        stats.up.fetch_add(up, Ordering::Relaxed);
-        stats.down.fetch_add(down, Ordering::Relaxed);
-    }
+    relay(tcp, ch.into_stream(), &stats).await;
     stats.active.fetch_sub(1, Ordering::Relaxed);
 }
 
@@ -141,13 +169,9 @@ async fn socks_client(conn: Arc<Connection>, mut tcp: TcpStream, stats: Arc<Tunn
     {
         return;
     }
-    let mut stream = ch.into_stream();
     stats.active.fetch_add(1, Ordering::Relaxed);
     stats.total.fetch_add(1, Ordering::Relaxed);
-    if let Ok((up, down)) = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await {
-        stats.up.fetch_add(up, Ordering::Relaxed);
-        stats.down.fetch_add(down, Ordering::Relaxed);
-    }
+    relay(tcp, ch.into_stream(), &stats).await;
     stats.active.fetch_sub(1, Ordering::Relaxed);
 }
 
