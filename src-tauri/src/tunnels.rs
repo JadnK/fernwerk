@@ -293,11 +293,8 @@ pub async fn remote_ports(
         .filter_map(|l| {
             let cols: Vec<&str> = l.split_whitespace().collect();
             // ss: State Recv-Q Send-Q Local Peer [Process]; netstat: Proto Recv Send Local Foreign State
-            let local = if cols.first() == Some(&"LISTEN") {
-                cols.get(3)?
-            } else {
-                cols.get(3)?
-            };
+            // In beiden Formaten steht die lokale Adresse in Spalte 4.
+            let local = cols.get(3)?;
             let (addr, port) = local.rsplit_once(':')?;
             let process = cols
                 .iter()
