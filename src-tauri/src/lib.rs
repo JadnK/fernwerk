@@ -4,6 +4,7 @@ mod ssh;
 mod state;
 mod stats;
 mod terminal;
+mod tunnels;
 mod vault;
 
 use tauri::Manager;
@@ -52,6 +53,11 @@ pub fn run() {
             // Monitoring
             stats::stats_fetch,
             stats::process_kill,
+            // Tunnel
+            tunnels::tunnel_start,
+            tunnels::tunnel_stop,
+            tunnels::tunnel_list,
+            tunnels::remote_ports,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");

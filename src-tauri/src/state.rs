@@ -6,11 +6,13 @@ use tokio::sync::{Mutex, RwLock};
 
 use crate::error::{AppError, AppResult};
 use crate::ssh::Connection;
+use crate::tunnels::RunningTunnel;
 use crate::vault::Vault;
 
 pub struct AppState {
     pub vault: Mutex<Vault>,
     pub conns: RwLock<HashMap<String, Arc<Connection>>>,
+    pub tunnels: Mutex<HashMap<String, RunningTunnel>>,
 }
 
 impl AppState {
@@ -18,6 +20,7 @@ impl AppState {
         Ok(Self {
             vault: Mutex::new(Vault::open(data_dir)?),
             conns: RwLock::new(HashMap::new()),
+            tunnels: Mutex::new(HashMap::new()),
         })
     }
 
