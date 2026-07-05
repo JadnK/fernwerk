@@ -1,6 +1,6 @@
 [package]
 name = "fernwerk"
-version = "0.3.0"
+version = "0.4.0"
 description = "SSH, SFTP, Monitoring und Server-Verwaltung in einem Tool"
 authors = ["JadnK"]
 license = "MIT"

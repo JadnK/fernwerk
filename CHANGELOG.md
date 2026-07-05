@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 – 2026-07-05
+
+- Tunnel: Local Forward (`-L`) und SOCKS5-Proxy (`-D`)
+- Tunnel pro Host speichern, Autostart beim Verbinden
+- Lauschende Server-Ports mit Ein-Klick-Weiterleitung
+
 ## 0.3.0 – 2026-05-31
 
 - Monitor: CPU, RAM, Swap, Load, Netzwerk mit Verlauf
