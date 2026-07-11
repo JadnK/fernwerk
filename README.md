@@ -23,6 +23,11 @@ Läuft auf Windows, macOS und Linux.
 - Datenträger-Belegung
 - Top-Prozesse mit Beenden (`TERM`/`KILL`)
 
+**Dienste**
+- Alle systemd-Units mit Status und Autostart
+- Starten, Stoppen, Neustarten, Aktivieren/Deaktivieren
+- `journalctl`-Logs pro Dienst
+
 **Tunnel**
 - Local Forward (`-L`) und SOCKS5-Proxy (`-D`)
 - Pro Host gespeichert, optional Autostart beim Verbinden
