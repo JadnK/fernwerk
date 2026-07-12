@@ -305,12 +305,16 @@ pub async fn services_list(state: State<'_, AppState>, conn_id: String) -> AppRe
     let conn = state.conn(&conn_id).await?;
     let out = conn
         .exec(
-            "systemctl list-units --type=service --all --no-legend --plain --no-pager; echo @@FW@@; \
+            "command -v systemctl >/dev/null 2>&1 || exit 3; \
+             systemctl list-units --type=service --all --no-legend --plain --no-pager; echo @@FW@@; \
              systemctl list-unit-files --type=service --no-legend --no-pager",
             None,
         )
         .await?;
-    if !out.ok() && out.stdout.trim().is_empty() {
+    if out.code == Some(3)
+        || out.stderr.contains("not been booted with systemd")
+        || out.stderr.contains("Failed to connect to bus")
+    {
         return Err(AppError::msg(
             "systemd ist auf diesem Server nicht verfügbar",
         ));
