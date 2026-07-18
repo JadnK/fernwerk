@@ -5,6 +5,7 @@ mod state;
 mod stats;
 mod terminal;
 mod tunnels;
+mod users;
 mod vault;
 
 use tauri::Manager;
@@ -58,6 +59,14 @@ pub fn run() {
             tunnels::tunnel_stop,
             tunnels::tunnel_list,
             tunnels::remote_ports,
+            // Benutzer
+            users::users_list,
+            users::user_create,
+            users::user_delete,
+            users::user_password,
+            users::user_lock,
+            users::user_update,
+            users::group_create,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");
