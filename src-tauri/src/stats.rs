@@ -280,6 +280,133 @@ pub async fn process_kill(
     Ok(())
 }
 
+// ---------------------------------------------------------------- systemd
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Service {
+    pub unit: String,
+    pub load: String,
+    pub active: String,
+    pub sub: String,
+    pub description: String,
+    pub enabled: String,
+}
+
+fn valid_unit(u: &str) -> bool {
+    !u.is_empty()
+        && u.len() < 256
+        && u.chars()
+            .all(|c| c.is_ascii_alphanumeric() || "@._-:\\".contains(c))
+}
+
+#[tauri::command]
+pub async fn services_list(state: State<'_, AppState>, conn_id: String) -> AppResult<Vec<Service>> {
+    let conn = state.conn(&conn_id).await?;
+    let out = conn
+        .exec(
+            "command -v systemctl >/dev/null 2>&1 || exit 3; \
+             systemctl list-units --type=service --all --no-legend --plain --no-pager; echo @@FW@@; \
+             systemctl list-unit-files --type=service --no-legend --no-pager",
+            None,
+        )
+        .await?;
+    if out.code == Some(3)
+        || out.stderr.contains("not been booted with systemd")
+        || out.stderr.contains("Failed to connect to bus")
+    {
+        return Err(AppError::msg(
+            "systemd ist auf diesem Server nicht verfügbar",
+        ));
+    }
+    let (units, files) = out.stdout.split_once(SEP).unwrap_or((&out.stdout, ""));
+    let enabled: std::collections::HashMap<&str, &str> = files
+        .lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace();
+            Some((it.next()?, it.next()?))
+        })
+        .collect();
+
+    Ok(units
+        .lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace();
+            let unit = it.next()?.trim_start_matches('●').to_string();
+            let unit = if unit.is_empty() {
+                it.next()?.to_string()
+            } else {
+                unit
+            };
+            Some(Service {
+                enabled: enabled
+                    .get(unit.as_str())
+                    .copied()
+                    .unwrap_or("")
+                    .to_string(),
+                load: it.next()?.to_string(),
+                active: it.next()?.to_string(),
+                sub: it.next()?.to_string(),
+                description: it.collect::<Vec<_>>().join(" "),
+                unit,
+            })
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn service_action(
+    state: State<'_, AppState>,
+    conn_id: String,
+    unit: String,
+    action: String,
+    sudo_password: Option<String>,
+) -> AppResult<()> {
+    if !valid_unit(&unit) {
+        return Err(AppError::msg("Ungültiger Dienstname"));
+    }
+    if !["start", "stop", "restart", "reload", "enable", "disable"].contains(&action.as_str()) {
+        return Err(AppError::msg("Ungültige Aktion"));
+    }
+    let conn = state.conn(&conn_id).await?;
+    conn.exec_root(
+        &format!("systemctl {action} {}", sh_quote(&unit)),
+        sudo_password,
+        None,
+    )
+    .await?
+    .check()?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn service_logs(
+    state: State<'_, AppState>,
+    conn_id: String,
+    unit: String,
+    lines: u32,
+    sudo_password: Option<String>,
+) -> AppResult<String> {
+    if !valid_unit(&unit) {
+        return Err(AppError::msg("Ungültiger Dienstname"));
+    }
+    let conn = state.conn(&conn_id).await?;
+    let cmd = format!(
+        "journalctl -u {} -n {} --no-pager -o short-iso",
+        sh_quote(&unit),
+        lines.min(5000)
+    );
+    let out = conn.exec(&cmd, None).await?;
+    if out.ok() && !out.stdout.contains("No journal files were opened") {
+        return Ok(out.stdout);
+    }
+    Ok(conn
+        .exec_root(&cmd, sudo_password, None)
+        .await?
+        .check()?
+        .stdout)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

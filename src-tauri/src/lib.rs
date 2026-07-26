@@ -53,6 +53,9 @@ pub fn run() {
             // Monitoring
             stats::stats_fetch,
             stats::process_kill,
+            stats::services_list,
+            stats::service_action,
+            stats::service_logs,
             // Tunnel
             tunnels::tunnel_start,
             tunnels::tunnel_stop,
