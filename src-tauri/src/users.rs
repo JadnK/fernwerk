@@ -255,6 +255,21 @@ pub async fn user_create(
         stdin = Some(format!("{}:{}\n", user.name, user.password).into_bytes());
     }
 
+    let key = user.authorized_key.trim();
+    if !key.is_empty() {
+        if key.contains('\n') || !key.starts_with("ssh-") && !key.starts_with("ecdsa-") {
+            return Err(AppError::msg("Ungültiger Public Key"));
+        }
+        let n = sh_quote(&user.name);
+        cmd.push_str(&format!(
+            " && H=$(getent passwd {n} | cut -d: -f6) && mkdir -p \"$H/.ssh\" && \
+             printf '%s\\n' {k} >> \"$H/.ssh/authorized_keys\" && \
+             chmod 700 \"$H/.ssh\" && chmod 600 \"$H/.ssh/authorized_keys\" && \
+             chown -R {n}: \"$H/.ssh\"",
+            k = sh_quote(key)
+        ));
+    }
+
     let conn = state.conn(&conn_id).await?;
     conn.exec_root(&cmd, sudo_password, stdin.as_deref())
         .await?
