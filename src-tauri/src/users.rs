@@ -148,9 +148,10 @@ pub async fn users_list(
                     member_of.insert(0, primary.to_string());
                 }
             }
+            let no_login = p[6].ends_with("/nologin") || p[6].ends_with("/false");
             Some(UserInfo {
                 admin: uid == 0 || member_of.iter().any(|g| ADMIN_GROUPS.contains(&g.as_str())),
-                system: uid != 0 && (uid < uid_min || uid == 65534),
+                system: uid != 0 && (uid < uid_min || uid == 65534 || no_login),
                 locked: shadow.as_ref().and_then(|s| s.get(&name).copied()),
                 name,
                 uid,
