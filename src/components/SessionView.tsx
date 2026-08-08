@@ -7,6 +7,7 @@ import {
   RotateCw,
   Server,
   SquareTerminal,
+  Users as UsersIcon,
   WifiOff,
   X,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { Monitor } from "./Monitor";
 import { Services } from "./Services";
 import { TerminalPane } from "./TerminalPane";
 import { Tunnels } from "./Tunnels";
+import { Users } from "./Users";
 
 export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: string }[] = [
   { id: "terminal", label: "Terminal", icon: SquareTerminal, key: "1" },
@@ -24,6 +26,7 @@ export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: strin
   { id: "monitor", label: "Monitor", icon: Activity, key: "3" },
   { id: "services", label: "Dienste", icon: Server, key: "4" },
   { id: "tunnels", label: "Tunnel", icon: ArrowRightLeft, key: "5" },
+  { id: "users", label: "Benutzer", icon: UsersIcon, key: "6" },
 ];
 
 export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
@@ -143,6 +146,11 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           {mounted.has("tunnels") && (
             <div className={`pane ${show("tunnels") ? "" : "hidden"}`}>
               <Tunnels connId={session.id} hostId={session.hostId} visible={show("tunnels")} />
+            </div>
+          )}
+          {mounted.has("users") && (
+            <div className={`pane ${show("users") ? "" : "hidden"}`}>
+              <Users sessionId={session.id} connId={session.id} visible={show("users")} />
             </div>
           )}
         </>

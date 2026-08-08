@@ -34,6 +34,12 @@ Läuft auf Windows, macOS und Linux.
 - Liste der lauschenden Server-Ports mit Ein-Klick-Weiterleitung
 - Live-Statistik: offene Verbindungen, übertragene Bytes
 
+**Benutzer**
+- Benutzer und Gruppen anzeigen, anlegen, bearbeiten, löschen
+- Passwort setzen, sperren/entsperren, Admin-Rechte (`sudo`/`wheel`)
+- Beim Anlegen direkt einen SSH-Key hinterlegen
+- sudo-Passwort wird bei Bedarf abgefragt und nur im Speicher gehalten
+
 **Sicherheit**
 - Host-Key-Prüfung (Trust on first use), Warnung bei geändertem Fingerprint
 - Passwörter und Passphrasen lokal mit ChaCha20-Poly1305 verschlüsselt
