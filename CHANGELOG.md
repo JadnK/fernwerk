@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 – 2026-08-09
+
+- Benutzerverwaltung: anlegen, bearbeiten, löschen, Passwort setzen, sperren
+- Gruppen anlegen, Admin-Rechte per Checkbox
+- systemd-Dienste: Status, Start/Stop/Restart, Autostart, Logs
+- sudo-Passwort wird bei Bedarf abgefragt und pro Sitzung gemerkt
+
 ## 0.4.0 – 2026-07-05
 
 - Tunnel: Local Forward (`-L`) und SOCKS5-Proxy (`-D`)
