@@ -119,12 +119,7 @@ pub async fn users_list(
             o.stdout
                 .lines()
                 .filter_map(|l| l.split_once(':'))
-                .map(|(n, h)| {
-                    (
-                        n.to_string(),
-                        h.starts_with('!') || h.starts_with('*') && n != "root",
-                    )
-                })
+                .map(|(n, h)| (n.to_string(), h.starts_with('!')))
                 .collect()
         });
 
