@@ -161,6 +161,10 @@ impl Vault {
         Ok(vault)
     }
 
+    pub fn keys_dir(&self) -> PathBuf {
+        self.dir.join("keys")
+    }
+
     fn refresh_flags(&mut self) {
         for h in &mut self.data.hosts {
             h.has_secret = self
