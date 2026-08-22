@@ -3,6 +3,7 @@ import {
   Activity,
   ArrowRightLeft,
   FolderTree,
+  KeyRound,
   Plus,
   RotateCw,
   Server,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { useStore, type Session } from "../lib/store";
 import type { Tool } from "../lib/types";
+import { Access } from "./Access";
 import { FileBrowser } from "./FileBrowser";
 import { Monitor } from "./Monitor";
 import { Services } from "./Services";
@@ -27,6 +29,7 @@ export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: strin
   { id: "services", label: "Dienste", icon: Server, key: "4" },
   { id: "tunnels", label: "Tunnel", icon: ArrowRightLeft, key: "5" },
   { id: "users", label: "Benutzer", icon: UsersIcon, key: "6" },
+  { id: "access", label: "SSH-Keys", icon: KeyRound, key: "7" },
 ];
 
 export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
@@ -151,6 +154,11 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           {mounted.has("users") && (
             <div className={`pane ${show("users") ? "" : "hidden"}`}>
               <Users sessionId={session.id} connId={session.id} visible={show("users")} />
+            </div>
+          )}
+          {mounted.has("access") && (
+            <div className={`pane ${show("access") ? "" : "hidden"}`}>
+              <Access connId={session.id} username={session.username} visible={show("access")} />
             </div>
           )}
         </>
