@@ -180,6 +180,15 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
         </label>
       )}
 
+      <Field label="Befehl nach dem Login (optional)">
+        <input
+          className="input mono"
+          value={h.startupCommand}
+          placeholder="cd /var/www && git status"
+          onChange={(e) => set("startupCommand", e.target.value)}
+        />
+      </Field>
+
       <div className="grid-2">
         <Field label="Tags (kommagetrennt)">
           <input
