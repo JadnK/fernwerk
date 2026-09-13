@@ -40,6 +40,11 @@ Läuft auf Windows, macOS und Linux.
 - Beim Anlegen direkt einen SSH-Key hinterlegen
 - sudo-Passwort wird bei Bedarf abgefragt und nur im Speicher gehalten
 
+**SSH-Keys**
+- Ed25519-Schlüssel erzeugen oder vorhandene importieren
+- Mit einem Klick in `authorized_keys` auf dem Server kopieren
+- Hinterlegte Schlüssel einsehen und entfernen
+
 **Sicherheit**
 - Host-Key-Prüfung (Trust on first use), Warnung bei geändertem Fingerprint
 - Passwörter und Passphrasen lokal mit ChaCha20-Poly1305 verschlüsselt

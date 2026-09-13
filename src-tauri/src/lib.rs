@@ -1,4 +1,5 @@
 mod error;
+mod keys;
 mod sftp;
 mod ssh;
 mod state;
@@ -70,6 +71,13 @@ pub fn run() {
             users::user_lock,
             users::user_update,
             users::group_create,
+            // Schlüssel
+            keys::keys_generate,
+            keys::keys_import,
+            keys::keys_delete,
+            keys::key_deploy,
+            keys::authorized_keys_list,
+            keys::authorized_keys_remove,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");
