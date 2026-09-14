@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 – 2026-09-14
+
+- SSH-Keys: Ed25519 erzeugen, vorhandene importieren
+- Schlüssel per Klick in `authorized_keys` kopieren, hinterlegte Schlüssel verwalten
+- Snippets in der Seitenleiste
+- Startbefehl pro Host
+
 ## 0.5.0 – 2026-08-09
 
 - Benutzerverwaltung: anlegen, bearbeiten, löschen, Passwort setzen, sperren
