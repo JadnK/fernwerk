@@ -509,3 +509,7 @@ input, textarea, select, button { font: inherit; color: inherit; }
   tab-size: 4; user-select: text; white-space: pre;
 }
 .logs { background: #0b0d10; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow: auto; flex: 1; user-select: text; }
+
+/* WIP: geteilte Terminals */
+.term-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+.term-split > .term-wrap { min-width: 0; }
