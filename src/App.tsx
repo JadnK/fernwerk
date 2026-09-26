@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LayoutGrid, Plus, X } from "lucide-react";
+import { CommandPalette } from "./components/CommandPalette";
 import { HomeView, KeysView, SettingsView } from "./components/Home";
 import { HostEditor } from "./components/HostEditor";
 import { SessionView } from "./components/SessionView";
@@ -127,6 +128,7 @@ export default function App() {
       {editingHost && (
         <HostEditor host={editingHost === "new" ? null : editingHost} onClose={() => useStore.setState({ editingHost: null })} />
       )}
+      <CommandPalette />
       <DialogHost />
       <Toasts />
     </div>
