@@ -30,6 +30,8 @@ pub fn run() {
             vault::snippet_save,
             vault::snippet_delete,
             vault::settings_save,
+            vault::vault_export,
+            vault::vault_import,
             // SSH
             ssh::ssh_connect,
             ssh::ssh_disconnect,
