@@ -49,11 +49,7 @@ impl client::Handler for Client {
 
 // ---------------------------------------------------------------- Connection
 
-#[allow(dead_code)]
 pub struct Connection {
-    pub id: String,
-    pub host_id: String,
-    pub label: String,
     pub username: String,
     pub handle: Handle<Client>,
     login_password: Option<String>,
@@ -330,9 +326,6 @@ pub async fn ssh_connect(
 
     let id = uuid::Uuid::new_v4().to_string();
     let conn = Arc::new(Connection {
-        id: id.clone(),
-        host_id: host_id.clone(),
-        label: profile.name.clone(),
         username: profile.username.clone(),
         handle,
         login_password,
