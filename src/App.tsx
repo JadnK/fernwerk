@@ -2,9 +2,10 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LayoutGrid, Plus, X } from "lucide-react";
+import { CommandPalette } from "./components/CommandPalette";
 import { HomeView, KeysView, SettingsView } from "./components/Home";
 import { HostEditor } from "./components/HostEditor";
-import { SessionView } from "./components/SessionView";
+import { SessionView, TOOLS } from "./components/SessionView";
 import { Sidebar } from "./components/Sidebar";
 import { DialogHost, Toasts } from "./components/ui";
 import { errText } from "./lib/api";
@@ -52,6 +53,24 @@ export default function App() {
         e.preventDefault();
         useStore.setState({ paletteOpen: !st.paletteOpen });
         return;
+      }
+      if (e.key === "Tab" && st.sessions.length > 0) {
+        e.preventDefault();
+        const i = st.sessions.findIndex((s) => s.id === st.active);
+        const n = (i + (e.shiftKey ? -1 : 1) + st.sessions.length) % st.sessions.length;
+        st.setActive(st.sessions[n].id);
+        return;
+      }
+      if (!st.active) return;
+      const tool = TOOLS.find((t) => t.key === e.key && !e.shiftKey && !e.altKey);
+      if (tool) {
+        e.preventDefault();
+        st.setTool(st.active, tool.id);
+        return;
+      }
+      if (e.shiftKey && e.code === "KeyT") {
+        e.preventDefault();
+        st.addTerminal(st.active);
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -127,6 +146,7 @@ export default function App() {
       {editingHost && (
         <HostEditor host={editingHost === "new" ? null : editingHost} onClose={() => useStore.setState({ editingHost: null })} />
       )}
+      <CommandPalette />
       <DialogHost />
       <Toasts />
     </div>

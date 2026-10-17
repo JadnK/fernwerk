@@ -368,3 +368,46 @@ pub async fn settings_save(state: State<'_, AppState>, settings: Settings) -> Ap
     v.data.settings = settings;
     v.save()
 }
+
+/// Exportiert Hosts + Snippets (ohne Secrets) als JSON-Datei.
+#[tauri::command]
+pub async fn vault_export(state: State<'_, AppState>, path: String) -> AppResult<()> {
+    let v = state.vault.lock().await;
+    let export = serde_json::json!({
+        "version": 1,
+        "hosts": v.data.hosts,
+        "snippets": v.data.snippets,
+    });
+    fs::write(path, serde_json::to_string_pretty(&export)?)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn vault_import(state: State<'_, AppState>, path: String) -> AppResult<usize> {
+    #[derive(Deserialize)]
+    struct Import {
+        #[serde(default)]
+        hosts: Vec<HostProfile>,
+        #[serde(default)]
+        snippets: Vec<Snippet>,
+    }
+    let imp: Import = serde_json::from_str(&fs::read_to_string(path)?)?;
+    let mut v = state.vault.lock().await;
+    let mut added = 0;
+    for mut h in imp.hosts {
+        if v.data.hosts.iter().any(|x| x.id == h.id) {
+            h.id = uuid::Uuid::new_v4().to_string();
+        }
+        h.has_secret = false;
+        v.data.hosts.push(h);
+        added += 1;
+    }
+    for mut s in imp.snippets {
+        if v.data.snippets.iter().any(|x| x.id == s.id) {
+            s.id = uuid::Uuid::new_v4().to_string();
+        }
+        v.data.snippets.push(s);
+    }
+    v.save()?;
+    Ok(added)
+}
