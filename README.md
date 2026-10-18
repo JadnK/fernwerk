@@ -58,7 +58,7 @@ Fertige Builds gibt es unter [Releases](../../releases):
 |---|---|
 | Windows | `Fernwerk_x.y.z_x64-setup.exe` oder `.msi` |
 | macOS | `.dmg` (Apple Silicon und Intel) |
-| Linux | `.AppImage`, `.deb`, `.rpm` |
+| Linux | `.AppImage`, `.deb`, `.rpm` (x64 und ARM64) |
 
 ## Entwicklung
 
