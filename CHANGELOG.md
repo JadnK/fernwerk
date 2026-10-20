@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 – 2026-10-20
+
+- Befehlspalette (`Strg+K`) für Hosts, Werkzeuge und Snippets
+- Tastenkürzel für Werkzeuge (`Strg+1…7`) und Sitzungswechsel (`Strg+Tab`)
+- Export/Import der Hosts als JSON (ohne Zugangsdaten)
+- Builds für Windows ARM64 und Linux ARM64
+- Viele kleine UI-Korrekturen
+
 ## 0.6.0 – 2026-09-14
 
 - SSH-Keys: Ed25519 erzeugen, vorhandene importieren
