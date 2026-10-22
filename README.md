@@ -107,7 +107,3 @@ Jeder Push auf `main` baut über GitHub Actions alle Plattformen und veröffentl
 
 - Monitoring, Dienste und Benutzerverwaltung setzen einen Linux-Server voraus. Terminal, SFTP und Tunnel funktionieren mit jedem SSH-Server.
 - Der Schlüssel für den lokalen Tresor liegt neben den Daten im App-Verzeichnis. Das schützt vor beiläufigem Mitlesen, nicht vor jemandem mit Zugriff auf dein Benutzerkonto.
-
-## Lizenz
-
-MIT
