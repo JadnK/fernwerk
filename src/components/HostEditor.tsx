@@ -40,9 +40,23 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
   );
   const keyPath = h.auth.type === "key" ? h.auth.keyPath : "";
 
+  /** "user@host:port" im Host-Feld in die Einzelfelder aufteilen (beim Verlassen des Felds und beim Speichern). */
+  const parseQuick = (x: HostProfile): HostProfile => {
+    const m = x.host.trim().match(/^(?:([^@\s]+)@)?([^:\s@]+)(?::(\d+))?$/);
+    if (!m || (!m[1] && !m[3])) return x;
+    return {
+      ...x,
+      username: m[1] ?? x.username,
+      host: m[2],
+      port: m[3] ? Number(m[3]) : x.port,
+      name: x.name || m[2],
+    };
+  };
+
   const save = async () => {
     setBusy(true);
-    const profile: HostProfile = { ...h, name: h.name.trim() || h.host.trim(), host: h.host.trim() };
+    const parsed = parseQuick(h);
+    const profile: HostProfile = { ...parsed, name: parsed.name.trim() || parsed.host.trim(), host: parsed.host.trim() };
     let secret: { password?: string; passphrase?: string } | undefined;
     if (clearSecret) secret = { password: "", passphrase: "" };
     else if (password || passphrase) secret = { password: password || undefined, passphrase: passphrase || undefined };
@@ -106,12 +120,13 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
         </Field>
       </div>
       <div className="grid-3">
-        <Field label="Host / IP">
+        <Field label="Host / IP (oder user@host:port)">
           <input
             className="input mono"
             value={h.host}
             placeholder="192.168.1.10"
             onChange={(e) => set("host", e.target.value)}
+            onBlur={() => setH(parseQuick)}
           />
         </Field>
         <Field label="Port">
