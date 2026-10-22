@@ -8,8 +8,22 @@ import { HostEditor } from "./components/HostEditor";
 import { SessionView, TOOLS } from "./components/SessionView";
 import { Sidebar } from "./components/Sidebar";
 import { DialogHost, Toasts } from "./components/ui";
+import { UpdateDialog, checkForUpdates } from "./components/Updater";
 import { errText } from "./lib/api";
+import { paneNav, type NavDir } from "./lib/nav";
 import { confirm, toast, useStore } from "./lib/store";
+
+/** Zurück/Vor: erst das aktive Werkzeug (z.B. Ordnerverlauf), dann die App-Historie. */
+function navigate(dir: NavDir) {
+  if (document.querySelector(".backdrop")) return; // nicht hinter offenen Dialogen
+  const st = useStore.getState();
+  const s = st.sessions.find((x) => x.id === st.active);
+  if (s) {
+    const handler = paneNav.get(`${s.id}:${s.tool}`);
+    if (handler?.(dir)) return;
+  }
+  st.goNav(dir);
+}
 
 export default function App() {
   const vault = useStore((s) => s.vault);
@@ -42,6 +56,48 @@ export default function App() {
       .setTitle(s ? `${s.label} – Fernwerk` : "Fernwerk")
       .catch(() => {});
   }, [active, sessions]);
+
+  // Update-Prüfung beim Start und alle 6 Stunden
+  useEffect(() => {
+    const first = setTimeout(() => checkForUpdates(false), 4000);
+    const every = setInterval(() => checkForUpdates(false), 6 * 60 * 60 * 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, []);
+
+  // Maustasten 4/5 (seitlich) = Zurück/Vor wie im Browser
+  useEffect(() => {
+    const isSide = (e: MouseEvent) => e.button === 3 || e.button === 4;
+    // Standardverhalten der WebView (Seiten-Historie) unterdrücken
+    const block = (e: MouseEvent) => {
+      if (isSide(e)) e.preventDefault();
+    };
+    const onUp = (e: MouseEvent) => {
+      if (!isSide(e)) return;
+      e.preventDefault();
+      navigate(e.button === 3 ? -1 : 1);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, .xterm")) return;
+      e.preventDefault();
+      navigate(e.key === "ArrowLeft" ? -1 : 1);
+    };
+    window.addEventListener("mousedown", block, true);
+    window.addEventListener("auxclick", block, true);
+    window.addEventListener("mouseup", onUp, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("mousedown", block, true);
+      window.removeEventListener("auxclick", block, true);
+      window.removeEventListener("mouseup", onUp, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, []);
 
   // Globale Tastenkürzel
   useEffect(() => {
@@ -146,6 +202,7 @@ export default function App() {
       {editingHost && (
         <HostEditor host={editingHost === "new" ? null : editingHost} onClose={() => useStore.setState({ editingHost: null })} />
       )}
+      <UpdateDialog />
       <CommandPalette />
       <DialogHost />
       <Toasts />

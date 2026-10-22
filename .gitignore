@@ -9,3 +9,7 @@ dist/
 # Tauri / Rust
 src-tauri/target/
 src-tauri/gen/
+
+# Signierschlüssel für Updates – niemals committen
+*.key
+.updater-key/

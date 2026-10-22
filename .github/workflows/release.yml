@@ -72,9 +72,25 @@ jobs:
 
       - run: npm ci
 
+      # Abschnitt der aktuellen Version aus dem CHANGELOG – erscheint im Release und im Update-Popup
+      - name: Release-Notes
+        id: notes
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          NOTES=$(awk -v v="$VERSION" '$0 ~ "^## "v" " {f=1; next} /^## / {f=0} f' CHANGELOG.md)
+          {
+            echo "body<<FW_EOF"
+            echo "$NOTES"
+            echo "FW_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signiert die Update-Pakete (Schlüssel: siehe README → Updates)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Optional: Code-Signing, sobald Zertifikate hinterlegt sind
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -82,7 +98,9 @@ jobs:
           tagName: v__VERSION__
           releaseName: Fernwerk v__VERSION__
           releaseBody: |
-            Downloads für alle Plattformen:
+            ${{ steps.notes.outputs.body }}
+
+            ### Downloads
 
             | System | Datei |
             |---|---|
@@ -91,7 +109,9 @@ jobs:
             | macOS Intel | `x64.dmg` |
             | Linux | `.AppImage`, `.deb` oder `.rpm` (amd64 / arm64) |
 
-            Änderungen: siehe [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+            Bereits installiert? Fernwerk meldet die neue Version selbst und installiert sie per Klick.
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

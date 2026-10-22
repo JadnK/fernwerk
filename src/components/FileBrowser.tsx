@@ -3,7 +3,11 @@ import { Channel } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
+  ClipboardPaste,
+  Copy,
   Download,
   Eye,
   EyeOff,
@@ -11,12 +15,14 @@ import {
   FilePlus,
   FileText,
   Folder,
+  FolderInput,
   FolderPlus,
   FolderUp,
   Home,
   Link2,
   Pencil,
   RefreshCw,
+  Scissors,
   Shield,
   Trash2,
   Upload,
@@ -24,6 +30,7 @@ import {
 } from "lucide-react";
 import { api, errText } from "../lib/api";
 import { bytes, joinPath, parentDir, uid, unixDate } from "../lib/format";
+import { paneNav, type NavDir } from "../lib/nav";
 import { ask, attempt, confirm, run, toast } from "../lib/store";
 import type { FileEntry, Progress } from "../lib/types";
 import { Bar, Modal } from "./ui";
@@ -39,9 +46,36 @@ interface Transfer {
   error: string | null;
 }
 
+interface Clip {
+  paths: string[];
+  mode: "move" | "copy";
+}
+
+interface DragState {
+  x: number;
+  y: number;
+  items: string[];
+  target: string | null;
+  copy: boolean;
+}
+
+const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+const baseName = (p: string) => p.replace(/\/+$/, "").split("/").pop() || p;
+
+/** "datei.txt" -> "datei (Kopie).txt" */
+function copyName(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? `${name.slice(0, dot)} (Kopie)${name.slice(dot)}` : `${name} (Kopie)`;
+}
+
+/** Eingabefelder und der Editor behalten ihre eigenen Tastenkürzel (Strg+A, Entf, Backspace …). */
+function isTextTarget(t: EventTarget | null): boolean {
+  return t instanceof HTMLElement && !!t.closest("input, textarea, select, [contenteditable]");
+}
+
 const TEXT_EXT = /\.(txt|md|conf|cfg|ini|env|json|ya?ml|toml|xml|html?|css|s?js|tsx?|jsx|php|py|rb|go|rs|java|c|h|cpp|sh|bash|zsh|service|log|sql|csv|lua|properties|gitignore|dockerignore)$/i;
 
-export function FileBrowser({ connId, visible }: { connId: string; visible: boolean }) {
+export function FileBrowser({ sessionId, connId, visible }: { sessionId: string; connId: string; visible: boolean }) {
   const [path, setPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,14 +88,30 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
   const [dragging, setDragging] = useState(false);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [editor, setEditor] = useState<{ path: string; content: string; original: string } | null>(null);
+  const [clip, setClip] = useState<Clip | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
   const lastClicked = useRef<number>(-1);
+  const pathRef = useRef<string | null>(null);
+  const hist = useRef<{ back: string[]; fwd: string[] }>({ back: [], fwd: [] });
+  const [, bumpHist] = useState(0);
 
   const load = useCallback(
-    async (p: string) => {
+    async (p: string, mode: "push" | "back" | "fwd" = "push") => {
       setLoading(true);
       setError(null);
       try {
         const list = await api.sftpList(connId, p);
+        const cur = pathRef.current;
+        if (cur && cur !== p) {
+          const h = hist.current;
+          if (mode === "push") {
+            h.back = [...h.back, cur].slice(-100);
+            h.fwd = [];
+          } else if (mode === "back") h.fwd.push(cur);
+          else h.back.push(cur);
+          bumpHist((x) => x + 1);
+        }
+        pathRef.current = p;
         setEntries(list);
         setPath(p);
         setSelected(new Set());
@@ -94,6 +144,129 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
   );
 
   const refresh = () => path && load(path);
+
+  // ------------------------------------------------------------ Verlauf (Zurück/Vor)
+
+  const go = useCallback(
+    (dir: NavDir): boolean => {
+      const h = hist.current;
+      const target = dir < 0 ? h.back.pop() : h.fwd.pop();
+      if (!target) return false;
+      bumpHist((x) => x + 1);
+      load(target, dir < 0 ? "back" : "fwd");
+      return true;
+    },
+    [load],
+  );
+
+  useEffect(() => {
+    const key = `${sessionId}:files`;
+    paneNav.set(key, go);
+    return () => {
+      paneNav.delete(key);
+    };
+  }, [sessionId, go]);
+
+  // ------------------------------------------------------------ Verschieben / Kopieren
+
+  const moveOrCopy = async (paths: string[], destDir: string, mode: "move" | "copy") => {
+    const inside = (p: string) => destDir === p || destDir.startsWith(p.replace(/\/+$/, "") + "/");
+    const items = paths.filter((p) => !inside(p));
+    if (items.length < paths.length) toast("error", "Ein Ordner kann nicht in sich selbst verschoben werden");
+    let done = 0;
+    for (const p of items) {
+      const sameDir = parentDir(p) === destDir;
+      if (mode === "move" && sameDir) continue;
+      const target = joinPath(destDir, sameDir ? copyName(baseName(p)) : baseName(p));
+      try {
+        if (mode === "move") {
+          await api.sftpRename(connId, p, target);
+        } else {
+          const r = await api.exec(
+            connId,
+            `if [ -e ${q(target)} ]; then echo "Ziel existiert bereits" >&2; exit 1; fi; cp -a -- ${q(p)} ${q(target)}`,
+          );
+          if (r.code !== 0) throw new Error(r.stderr.trim() || `Exit ${r.code}`);
+        }
+        done++;
+      } catch (e) {
+        toast("error", `${baseName(p)}: ${errText(e)}`);
+      }
+    }
+    if (done > 0) {
+      toast("ok", `${done} Element${done === 1 ? "" : "e"} ${mode === "move" ? "verschoben" : "kopiert"} nach ${destDir}`);
+    }
+    refresh();
+    return done;
+  };
+  const moveRef = useRef(moveOrCopy);
+  moveRef.current = moveOrCopy;
+
+  const cutOrCopy = (mode: Clip["mode"], paths: string[]) => {
+    if (paths.length === 0) return;
+    setClip({ paths, mode });
+    toast("info", `${paths.length} Element${paths.length === 1 ? "" : "e"} ${mode === "move" ? "ausgeschnitten" : "kopiert"} – mit Strg+V einfügen`);
+  };
+
+  const paste = async () => {
+    if (!clip || !path) return;
+    await moveOrCopy(clip.paths, path, clip.mode);
+    if (clip.mode === "move") setClip(null);
+  };
+
+  const moveTo = async (paths: string[]) => {
+    if (paths.length === 0 || !path) return;
+    const r = await ask({
+      title: paths.length === 1 ? `„${baseName(paths[0])}“ verschieben` : `${paths.length} Elemente verschieben`,
+      fields: [
+        { name: "dest", label: "Zielordner", value: path },
+        { name: "copy", label: "Kopieren statt verschieben", type: "checkbox", value: false },
+      ],
+      confirm: "Ausführen",
+    });
+    if (!r) return;
+    const dest = String(r.dest).trim().replace(/(.)\/+$/, "$1");
+    if (!dest.startsWith("/")) return toast("error", "Bitte einen absoluten Pfad angeben");
+    await moveOrCopy(paths, dest, r.copy ? "copy" : "move");
+  };
+
+  // Ziehen per Maus (eigene Umsetzung, weil das native Drag & Drop für Uploads reserviert ist)
+  const dragStart = useRef<{ x: number; y: number; items: string[] } | null>(null);
+
+  const onRowMouseDown = (ev: React.MouseEvent, e: FileEntry) => {
+    if (ev.button !== 0 || (ev.target as HTMLElement).closest("button")) return;
+    const items = selected.has(e.path) ? [...selected] : [e.path];
+    dragStart.current = { x: ev.clientX, y: ev.clientY, items };
+  };
+
+  useEffect(() => {
+    const findTarget = (x: number, y: number) => {
+      const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-drop]");
+      return el?.dataset.drop ?? null;
+    };
+    const onMove = (ev: MouseEvent) => {
+      const st = dragStart.current;
+      if (!st) return;
+      if (!drag && Math.hypot(ev.clientX - st.x, ev.clientY - st.y) < 6) return;
+      let target = findTarget(ev.clientX, ev.clientY);
+      if (target && st.items.includes(target)) target = null;
+      setDrag({ x: ev.clientX, y: ev.clientY, items: st.items, target, copy: ev.ctrlKey || ev.altKey });
+    };
+    const onUp = (ev: MouseEvent) => {
+      const st = dragStart.current;
+      dragStart.current = null;
+      if (!st || !drag) return;
+      setDrag(null);
+      const target = drag.target;
+      if (target) moveRef.current(st.items, target, ev.ctrlKey || ev.altKey ? "copy" : "move");
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [drag]);
 
   // ------------------------------------------------------------ Transfers
 
@@ -247,17 +420,26 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
   };
 
   const onKey = (ev: React.KeyboardEvent) => {
-    if ((ev.target as HTMLElement).tagName === "INPUT") return;
+    if (isTextTarget(ev.target) || editor) return;
+    const mod = ev.ctrlKey || ev.metaKey;
+    const key = ev.key.toLowerCase();
     if (ev.key === "Delete") remove([...selected]);
     if (ev.key === "Backspace" && path) load(parentDir(path));
+    if (ev.key === "F2" && selected.size === 1) {
+      const e = entries.find((x) => selected.has(x.path));
+      if (e) rename(e);
+    }
     if (ev.key === "F5") {
       ev.preventDefault();
       refresh();
     }
-    if ((ev.ctrlKey || ev.metaKey) && ev.key === "a") {
+    if (mod && key === "a") {
       ev.preventDefault();
       setSelected(new Set(shown.map((e) => e.path)));
     }
+    if (mod && key === "x") cutOrCopy("move", [...selected]);
+    if (mod && key === "c") cutOrCopy("copy", [...selected]);
+    if (mod && key === "v") paste();
   };
 
   const crumbs = useMemo(() => {
@@ -271,7 +453,18 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
   return (
     <div className="pane" tabIndex={0} onKeyDown={onKey} style={{ outline: "none" }}>
       <div className="pathbar">
-        <button className="btn icon ghost" title="Übergeordneter Ordner" onClick={() => path && load(parentDir(path))}>
+        <button className="btn icon ghost" title="Zurück (Maustaste 4, Alt+←)" disabled={hist.current.back.length === 0} onClick={() => go(-1)}>
+          <ArrowLeft size={16} />
+        </button>
+        <button className="btn icon ghost" title="Vor (Maustaste 5, Alt+→)" disabled={hist.current.fwd.length === 0} onClick={() => go(1)}>
+          <ArrowRight size={16} />
+        </button>
+        <button
+          className={`btn icon ghost ${drag && path && drag.target === parentDir(path) ? "drop-on" : ""}`}
+          title="Übergeordneter Ordner"
+          data-drop={path && path !== "/" ? parentDir(path) : undefined}
+          onClick={() => path && load(parentDir(path))}
+        >
           <ArrowUp size={16} />
         </button>
         <button className="btn icon ghost" title="Home" onClick={() => api.sftpHome(connId).then(load)}>
@@ -304,7 +497,11 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
             {crumbs.map((c, i) => (
               <span key={c.path} className="row" style={{ gap: 2 }}>
                 {i > 1 && <span className="dim">/</span>}
-                <span className="crumb" onClick={() => load(c.path)}>
+                <span
+                  className={`crumb ${drag?.target === c.path ? "drop-on" : ""}`}
+                  data-drop={c.path}
+                  onClick={() => load(c.path)}
+                >
                   {c.name}
                 </span>
               </span>
@@ -346,6 +543,24 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
         <button className="btn sm ghost danger" disabled={sel.length === 0} onClick={() => remove(sel)}>
           <Trash2 size={14} /> Löschen
         </button>
+        <span className="dim">|</span>
+        <button className="btn sm icon ghost" title="Ausschneiden (Strg+X)" disabled={sel.length === 0} onClick={() => cutOrCopy("move", sel)}>
+          <Scissors size={14} />
+        </button>
+        <button className="btn sm icon ghost" title="Kopieren (Strg+C)" disabled={sel.length === 0} onClick={() => cutOrCopy("copy", sel)}>
+          <Copy size={14} />
+        </button>
+        <button
+          className="btn sm ghost"
+          title="Einfügen (Strg+V)"
+          disabled={!clip}
+          onClick={paste}
+        >
+          <ClipboardPaste size={14} /> Einfügen{clip ? ` (${clip.paths.length})` : ""}
+        </button>
+        <button className="btn sm ghost" disabled={sel.length === 0} onClick={() => moveTo(sel)}>
+          <FolderInput size={14} /> Verschieben nach…
+        </button>
         <span className="session-meta">
           {shown.length} Einträge{sel.length > 0 && ` · ${sel.length} ausgewählt`}
         </span>
@@ -378,7 +593,14 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
                 return (
                   <tr
                     key={e.path}
-                    className={selected.has(e.path) ? "sel" : ""}
+                    className={[
+                      selected.has(e.path) ? "sel" : "",
+                      drag?.target === e.path ? "drop-on" : "",
+                      drag?.items.includes(e.path) ? "dragged" : "",
+                      clip?.mode === "move" && clip.paths.includes(e.path) ? "cut" : "",
+                    ].join(" ")}
+                    data-drop={isDir ? e.path : undefined}
+                    onMouseDown={(ev) => onRowMouseDown(ev, e)}
                     onClick={(ev) => clickRow(ev, i, e)}
                     onDoubleClick={() => openEntry(e)}
                   >
@@ -410,7 +632,10 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
                         <button className="btn sm icon ghost" title="Herunterladen" onClick={() => download([e.path])}>
                           <Download size={13} />
                         </button>
-                        <button className="btn sm icon ghost" title="Umbenennen" onClick={() => rename(e)}>
+                        <button className="btn sm icon ghost" title="Verschieben nach…" onClick={() => moveTo([e.path])}>
+                          <FolderInput size={13} />
+                        </button>
+                        <button className="btn sm icon ghost" title="Umbenennen (F2)" onClick={() => rename(e)}>
                           <Pencil size={13} />
                         </button>
                         <button className="btn sm icon ghost" title="Rechte" onClick={() => chmod(e)}>
@@ -459,6 +684,15 @@ export function FileBrowser({ connId, visible }: { connId: string; visible: bool
               </div>
             );
           })}
+        </div>
+      )}
+
+      {drag && (
+        <div className="drag-ghost" style={{ left: drag.x + 14, top: drag.y + 10 }}>
+          {drag.items.length === 1 ? baseName(drag.items[0]) : `${drag.items.length} Elemente`}
+          <span className="dim">
+            {drag.target ? ` → ${drag.copy ? "kopieren nach" : "verschieben nach"} ${baseName(drag.target) || "/"}` : ""}
+          </span>
         </div>
       )}
 
@@ -542,6 +776,18 @@ function FileEditor({
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onKeyDown={(e) => {
+          // Tasten gehören dem Editor, nicht dem Dateibrowser dahinter
+          e.stopPropagation();
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+            e.preventDefault();
+            e.currentTarget.select();
+            return;
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            close();
+            return;
+          }
           if ((e.ctrlKey || e.metaKey) && e.key === "s") {
             e.preventDefault();
             if (dirty) save();

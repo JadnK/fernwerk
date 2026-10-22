@@ -17,6 +17,8 @@ Läuft auf Windows, macOS und Linux.
 - Upload/Download von Dateien *und* Ordnern (rekursiv), mit Fortschritt und Abbrechen
 - Drag & Drop aus dem Dateimanager
 - Dateien direkt bearbeiten (bis 5 MB), Rechte setzen, umbenennen, löschen
+- Verschieben und Kopieren per Ziehen, Strg+X/C/V oder „Verschieben nach…“
+- Zurück/Vor durch besuchte Ordner (Maustasten 4/5, Alt+←/→)
 
 **Monitor**
 - CPU, RAM, Swap, Load, Netzwerk-Durchsatz live mit Verlauf
@@ -101,7 +103,22 @@ SSH läuft komplett in Rust ([russh](https://github.com/Eugeny/russh)), kein Ope
 
 ### Releases
 
-Jeder Push auf `main` baut über GitHub Actions alle Plattformen und veröffentlicht das Release `v<version>` aus `src-tauri/tauri.conf.json`. Für ein neues Release die Version dort und in `package.json` / `Cargo.toml` erhöhen.
+Jeder Push auf `main` baut über GitHub Actions alle Plattformen und veröffentlicht das Release `v<version>` aus `src-tauri/tauri.conf.json`. Für ein neues Release die Version dort und in `package.json` / `Cargo.toml` erhöhen und einen Abschnitt `## <version> – <datum>` im `CHANGELOG.md` anlegen – der wird zu den Release-Notes und erscheint im Update-Popup.
+
+### Updates
+
+Fernwerk prüft beim Start und alle 6 Stunden `releases/latest/download/latest.json` und bietet neue Versionen zur Installation an. Die Pakete sind mit einem eigenen Schlüssel signiert (Public Key in `tauri.conf.json`).
+
+Einmalig einrichten: *Settings → Secrets and variables → Actions → New repository secret*
+
+| Secret | Inhalt |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | Inhalt der privaten Schlüsseldatei |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | leer lassen bzw. nicht anlegen (Schlüssel ohne Passwort) |
+
+Den privaten Schlüssel sicher aufbewahren – geht er verloren, können installierte Versionen keine Updates mehr annehmen.
+
+Lokaler Release-Build ohne Schlüssel: `npm run tauri build -- --no-bundle` oder die Umgebungsvariable `TAURI_SIGNING_PRIVATE_KEY` setzen.
 
 ## Hinweise
 

@@ -48,6 +48,19 @@ export interface DialogSpec {
 
 export type DialogResult = Record<string, string | boolean>;
 
+export interface NavEntry {
+  active: string | null;
+  view: View;
+  tool: Tool | null;
+}
+
+export interface UpdateInfo {
+  version: string;
+  current: string;
+  notes: string;
+  date: string | null;
+}
+
 export interface Toast {
   id: string;
   kind: "info" | "error" | "ok";
@@ -64,6 +77,9 @@ interface State {
   connecting: Record<string, boolean>;
   dialog: (DialogSpec & { resolve: (r: DialogResult | null) => void }) | null;
   toasts: Toast[];
+  navBack: NavEntry[];
+  navFwd: NavEntry[];
+  update: UpdateInfo | null;
 
   reloadVault: () => Promise<void>;
   setView: (v: View) => void;
@@ -75,9 +91,28 @@ interface State {
   connectHost: (hostId: string) => Promise<void>;
   disconnect: (sessionId: string) => Promise<void>;
   reconnect: (sessionId: string) => Promise<void>;
+  /** Einen Schritt in der App-Historie zurück (-1) oder vor (1). */
+  goNav: (dir: -1 | 1) => boolean;
 }
 
-export const useStore = create<State>((set, get) => ({
+const snap = (s: Pick<State, "active" | "view" | "sessions">): NavEntry => ({
+  active: s.active,
+  view: s.view,
+  tool: s.sessions.find((x) => x.id === s.active)?.tool ?? null,
+});
+const sameNav = (a: NavEntry, b: NavEntry) => a.active === b.active && a.view === b.view && a.tool === b.tool;
+
+export const useStore = create<State>((set, get) => {
+  /** Führt eine Navigation aus und merkt sich den vorherigen Stand für „Zurück“. */
+  const withNav = (change: () => void) => {
+    const before = snap(get());
+    change();
+    if (!sameNav(before, snap(get()))) {
+      set((s) => ({ navBack: [...s.navBack, before].slice(-100), navFwd: [] }));
+    }
+  };
+
+  return {
   vault: null,
   sessions: [],
   active: null,
@@ -87,15 +122,43 @@ export const useStore = create<State>((set, get) => ({
   connecting: {},
   dialog: null,
   toasts: [],
+  navBack: [],
+  navFwd: [],
+  update: null,
 
   reloadVault: async () => {
     set({ vault: await api.vaultLoad() });
   },
 
-  setView: (view) => set({ view, active: null }),
-  setActive: (active) => set({ active }),
+  setView: (view) => withNav(() => set({ view, active: null })),
+  setActive: (active) => withNav(() => set({ active })),
 
-  setTool: (sessionId, tool) => get().updateSession(sessionId, { tool }),
+  setTool: (sessionId, tool) => withNav(() => get().updateSession(sessionId, { tool })),
+
+  goNav: (dir) => {
+    const s = get();
+    const stack = [...(dir < 0 ? s.navBack : s.navFwd)];
+    const cur = snap(s);
+    while (stack.length) {
+      const e = stack.pop()!;
+      // Geschlossene Sitzungen überspringen
+      if (e.active && !s.sessions.some((x) => x.id === e.active)) continue;
+      if (sameNav(e, cur)) continue;
+      const other = [...(dir < 0 ? s.navFwd : s.navBack), cur];
+      set((st) => ({
+        ...(dir < 0 ? { navBack: stack, navFwd: other } : { navFwd: stack, navBack: other }),
+        active: e.active,
+        view: e.view,
+        sessions:
+          e.active && e.tool
+            ? st.sessions.map((x) => (x.id === e.active ? { ...x, tool: e.tool! } : x))
+            : st.sessions,
+      }));
+      return true;
+    }
+    set(dir < 0 ? { navBack: [] } : { navFwd: [] });
+    return false;
+  },
 
   updateSession: (id, patch) =>
     set((s) => ({ sessions: s.sessions.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
@@ -156,7 +219,7 @@ export const useStore = create<State>((set, get) => ({
             activeTerm: null,
           };
           session.activeTerm = session.terminals[0].key;
-          set((s) => ({ sessions: [...s.sessions, session], active: session.id }));
+          withNav(() => set((s) => ({ sessions: [...s.sessions, session], active: session.id })));
           void get().reloadVault();
 
           for (const t of host.tunnels.filter((t) => t.autoStart)) {
@@ -239,7 +302,8 @@ export const useStore = create<State>((set, get) => ({
     await get().disconnect(sessionId);
     await get().connectHost(s.hostId);
   },
-}));
+  };
+});
 
 export function humanError(msg: string): string {
   if (msg.includes("AUTH_FAILED")) return "Anmeldung fehlgeschlagen";

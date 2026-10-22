@@ -509,3 +509,22 @@ input, textarea, select, button { font: inherit; color: inherit; }
   tab-size: 4; user-select: text; white-space: pre;
 }
 .logs { background: #0b0d10; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow: auto; flex: 1; user-select: text; }
+
+/* ------------------------------------------------------------ Verschieben per Drag */
+
+.table tr.drop-on td { background: var(--accent-soft); box-shadow: inset 0 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
+.table tr.dragged td { opacity: 0.45; }
+.table tr.cut td { opacity: 0.55; }
+.crumb.drop-on, .btn.drop-on { background: var(--accent-soft); color: var(--accent); outline: 1px solid var(--accent); }
+.drag-ghost {
+  position: fixed; z-index: 300; pointer-events: none;
+  background: var(--panel-3); border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 4px 9px; font-size: 12px; white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ------------------------------------------------------------ Update */
+
+.update-notes { margin: 0; padding-left: 18px; color: var(--muted); max-height: 220px; overflow: auto; }
+.update-notes li + li { margin-top: 3px; }
+.version-chip { font: 12px var(--mono); padding: 1px 6px; border-radius: 4px; background: var(--panel-3); }

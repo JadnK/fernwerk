@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 – 2026-10-23
+
+- Automatische Updates: Hinweis bei neuer Version, Installation mit einem Klick
+- Dateien verschieben und kopieren: Ziehen auf Ordner oder Pfadleiste, Strg+X/C/V, „Verschieben nach…“
+- Zurück/Vor im Dateibrowser und zwischen Ansichten (Maustasten 4/5, Alt+←/→)
+- Editor: Strg+A markiert den ganzen Text, Entf und Backspace löschen nicht mehr Dateien im Hintergrund
+- Normaler Mauszeiger über Scrollleisten von Textfeldern
+- F2 benennt die ausgewählte Datei um
+
 ## 1.0.0 – 2026-10-20
 
 - Befehlspalette (`Strg+K`) für Hosts, Werkzeuge und Snippets

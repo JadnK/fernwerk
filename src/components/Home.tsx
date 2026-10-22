@@ -6,6 +6,7 @@ import { relative, unixDate } from "../lib/format";
 import { ask, confirm, run, toast, useStore } from "../lib/store";
 import type { Settings } from "../lib/types";
 import { Empty, Field } from "./ui";
+import { UpdateSettings } from "./Updater";
 
 export function HomeView() {
   const vault = useStore((s) => s.vault);
@@ -277,6 +278,12 @@ export function SettingsView() {
         Passwörter und Passphrasen werden lokal verschlüsselt gespeichert und nie exportiert.
       </div>
 
+      <div className="section-title">Updates</div>
+      <UpdateSettings />
+      <div className="dim" style={{ fontSize: 12, marginTop: 8 }}>
+        Fernwerk prüft beim Start und alle 6 Stunden auf neue Versionen.
+      </div>
+
       <div className="section-title">Tastenkürzel</div>
       <table className="table" style={{ maxWidth: 520 }}>
         <tbody>
@@ -287,6 +294,9 @@ export function SettingsView() {
             ["Strg + Tab", "Nächste Sitzung"],
             ["Strg + Shift + C / V", "Kopieren / Einfügen im Terminal"],
             ["Strg + Shift + F", "Im Terminal suchen"],
+            ["Maustaste 4 / 5, Alt + ← / →", "Zurück / Vor (Ordner, Ansichten)"],
+            ["Strg + X / C / V", "Dateien ausschneiden / kopieren / einfügen"],
+            ["Ziehen (Strg = kopieren)", "Dateien in Ordner verschieben"],
             ["Rechtsklick", "Auswahl kopieren bzw. einfügen"],
           ].map(([k, v]) => (
             <tr key={k}>

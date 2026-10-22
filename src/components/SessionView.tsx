@@ -133,7 +133,7 @@ export function SessionView({ session, visible }: { session: Session; visible: b
         <>
           {mounted.has("files") && (
             <div className={`pane ${show("files") ? "" : "hidden"}`}>
-              <FileBrowser connId={session.id} visible={show("files")} />
+              <FileBrowser sessionId={session.id} connId={session.id} visible={show("files")} />
             </div>
           )}
           {mounted.has("monitor") && (
