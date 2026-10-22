@@ -17,6 +17,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             let state = state::AppState::new(&dir).map_err(|e| e.to_string())?;

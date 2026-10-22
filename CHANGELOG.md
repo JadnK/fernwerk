@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 – 2026-10-23
+
+- Terminal: Einfügen mit Strg+V bzw. Strg+Shift+V fügt den Text nicht mehr doppelt ein
+- Mehrzeiliges Einfügen nutzt Bracketed Paste – Befehle werden nicht sofort ausgeführt
+
 ## 1.1.0 – 2026-10-23
 
 - Automatische Updates: Hinweis bei neuer Version, Installation mit einem Klick

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Channel } from "@tauri-apps/api/core";
+import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -105,6 +106,33 @@ export function TerminalPane({
       }
       api.termWrite(connId, id, data).catch(() => {});
     };
+    // Strg+V / Strg+Shift+V: nur das native Paste-Event der WebView fügt ein (genau einmal).
+    // Rechtsklick hat kein natives Event und liest die Zwischenablage über das Clipboard-Plugin.
+    // Ein zweites Einfügen innerhalb kurzer Zeit mit demselben Text wird verworfen.
+    let last = { text: "", at: 0 };
+    const pasteText = (t: string) => {
+      if (!t) return;
+      const now = Date.now();
+      if (t === last.text && now - last.at < 400) return;
+      last = { text: t, at: now };
+      term.paste(t); // respektiert Bracketed Paste (bash, vim …)
+    };
+    const pasteClipboard = () => {
+      readText()
+        .then((t) => pasteText(t ?? ""))
+        .catch(() => {});
+    };
+    const copyText = (t: string) => {
+      writeText(t).catch(() => navigator.clipboard?.writeText(t).catch(() => {}));
+    };
+    const onNativePaste = (e: ClipboardEvent) => {
+      // Selbst übernehmen, damit Dedupe und Bracketed Paste immer greifen
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      pasteText(e.clipboardData?.getData("text/plain") ?? "");
+    };
+    hostRef.current!.addEventListener("paste", onNativePaste, true);
+
     writers.set(tab.key, (text) => {
       send(text);
       term.focus();
@@ -115,11 +143,11 @@ export function TerminalPane({
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.shiftKey && e.code === "KeyC") {
         const sel = term.getSelection();
-        if (sel) navigator.clipboard.writeText(sel);
+        if (sel) copyText(sel);
         return false;
       }
-      if (mod && e.shiftKey && e.code === "KeyV") {
-        navigator.clipboard.readText().then((t) => t && send(t));
+      if (mod && e.code === "KeyV" && !e.altKey) {
+        // xterm soll kein ^V senden; das Einfügen kommt über das native Paste-Event
         return false;
       }
       if (mod && e.shiftKey && e.code === "KeyF") {
@@ -134,7 +162,7 @@ export function TerminalPane({
     term.onSelectionChange(() => {
       if (settings.copyOnSelect) {
         const sel = term.getSelection();
-        if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+        if (sel) copyText(sel);
       }
     });
 
@@ -173,16 +201,19 @@ export function TerminalPane({
       e.preventDefault();
       const sel = term.getSelection();
       if (sel) {
-        navigator.clipboard.writeText(sel);
+        copyText(sel);
         term.clearSelection();
       } else {
-        navigator.clipboard.readText().then((t) => t && send(t));
+        pasteClipboard();
       }
     };
     hostRef.current!.addEventListener("contextmenu", onContext);
+    const hostEl = hostRef.current!;
 
     return () => {
       disposed = true;
+      hostEl.removeEventListener("paste", onNativePaste, true);
+      hostEl.removeEventListener("contextmenu", onContext);
       ro.disconnect();
       writers.delete(tab.key);
       if (termIdRef.current) api.termClose(connId, termIdRef.current);
