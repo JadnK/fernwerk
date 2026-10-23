@@ -288,8 +288,8 @@ export function SettingsView() {
       <table className="table" style={{ maxWidth: 520 }}>
         <tbody>
           {[
-            ["Strg + K", "Befehlspalette"],
-            ["Strg + 1 … 7", "Werkzeug wechseln"],
+            ["Strg + K", "Befehlspalette (im Terminal: Strg + Shift + K)"],
+            ["Strg + 1 … 7", "Werkzeug wechseln (im Terminal: Strg + Shift + 1 … 7)"],
             ["Strg + Shift + T", "Neue Shell"],
             ["Strg + Tab", "Nächste Sitzung"],
             ["Strg + Shift + C / V", "Kopieren / Einfügen im Terminal"],

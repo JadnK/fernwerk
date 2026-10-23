@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2 – 2026-10-23
+
+- Terminal: Strg-Kürzel gehen an die Shell (nano, bash, vim) statt an Fernwerk – z.B. Strg+K schneidet in nano wieder die Zeile aus
+- App-Kürzel im Terminal mit Shift: Befehlspalette Strg+Shift+K, Werkzeuge Strg+Shift+1…7
+
 ## 1.1.1 – 2026-10-23
 
 - Terminal: Einfügen mit Strg+V bzw. Strg+Shift+V fügt den Text nicht mehr doppelt ein

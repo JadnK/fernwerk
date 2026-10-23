@@ -73,7 +73,7 @@ export function Sidebar() {
       <div className="search">
         <Search size={14} />
         <input placeholder="Hosts filtern" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <span className="kbd" title="Befehlspalette">Strg K</span>
+        <span className="kbd" title="Befehlspalette – im Terminal Strg+Shift+K">Strg K</span>
       </div>
 
       <div className="side-scroll">

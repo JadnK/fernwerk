@@ -104,28 +104,38 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
       const mod = e.ctrlKey || e.metaKey;
-      if (!mod) return;
-      if (e.key.toLowerCase() === "k" && !e.shiftKey) {
+      if (!mod || e.altKey) return;
+      // Im Terminal gehören Strg+Taste der Shell (nano: Strg+K = Zeile ausschneiden,
+      // bash: Strg+R, Strg+W …). App-Kürzel laufen dort nur mit zusätzlichem Shift.
+      const inTerminal = !!(e.target as HTMLElement | null)?.closest?.(".xterm");
+      if (inTerminal && !e.shiftKey && e.key !== "Tab") return;
+
+      if (e.code === "KeyK" && (inTerminal || !e.shiftKey)) {
         e.preventDefault();
+        e.stopPropagation(); // xterm soll das Kürzel nicht zusätzlich an die Shell senden
         useStore.setState({ paletteOpen: !st.paletteOpen });
         return;
       }
       if (e.key === "Tab" && st.sessions.length > 0) {
         e.preventDefault();
+        e.stopPropagation(); // xterm soll das Kürzel nicht zusätzlich an die Shell senden
         const i = st.sessions.findIndex((s) => s.id === st.active);
         const n = (i + (e.shiftKey ? -1 : 1) + st.sessions.length) % st.sessions.length;
         st.setActive(st.sessions[n].id);
         return;
       }
       if (!st.active) return;
-      const tool = TOOLS.find((t) => t.key === e.key && !e.shiftKey && !e.altKey);
+      // e.code statt e.key, damit Strg+Shift+1 nicht zu „!“ wird
+      const tool = TOOLS.find((t) => e.code === `Digit${t.key}` && e.shiftKey === inTerminal);
       if (tool) {
         e.preventDefault();
+        e.stopPropagation(); // xterm soll das Kürzel nicht zusätzlich an die Shell senden
         st.setTool(st.active, tool.id);
         return;
       }
       if (e.shiftKey && e.code === "KeyT") {
         e.preventDefault();
+        e.stopPropagation(); // xterm soll das Kürzel nicht zusätzlich an die Shell senden
         st.addTerminal(st.active);
       }
     };

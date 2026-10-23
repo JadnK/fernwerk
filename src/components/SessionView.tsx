@@ -55,7 +55,7 @@ export function SessionView({ session, visible }: { session: Session; visible: b
               key={t.id}
               className={`tool ${session.tool === t.id ? "on" : ""}`}
               onClick={() => setTool(session.id, t.id)}
-              title={`${t.label} (Strg+${t.key})`}
+              title={`${t.label} (Strg+${t.key}, im Terminal Strg+Shift+${t.key})`}
             >
               <t.icon size={15} />
               {t.label}
