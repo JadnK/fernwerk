@@ -503,9 +503,6 @@ export function Consoles({ sessionId, connId, visible }: { sessionId: string; co
       <div className="console-list">
         <div className="side-section">
           <span>Server &amp; Programme</span>
-          <button className="btn sm icon ghost" title="Neue Konsole" disabled={!snap} onClick={() => setEditing("new")}>
-            <Plus size={13} />
-          </button>
         </div>
         {defs === null && <div className="dim" style={{ padding: "6px 14px" }}>Lade…</div>}
         {defs?.map((d) => {

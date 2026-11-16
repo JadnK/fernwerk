@@ -8,30 +8,31 @@
 /*
  * Fernwerk – Schwarz & Gold.
  * Zwei Farben: fast reines Schwarz für Flächen, Gold für alles, was zählt.
- * Text ist ein warmes Elfenbein (Gold mit wenig Sättigung), Abstufungen nur über Helligkeit.
+ * Flächen und Text sind neutrale Grautöne, Abstufungen nur über Helligkeit.
  * Rot gibt es genau einmal: für Fehler und Zerstörerisches.
  */
 :root {
-  --bg: #080807;
-  --panel: #0e0d0b;
-  --panel-2: #14130f;
-  --panel-3: #1b1914;
-  --line: #221f18;
-  --line-2: #312c21;
-  --text: #ebe2cc;
-  --muted: #a8996f;
-  --dim: #6b604a;
-  --accent: #d1a53c;
-  --accent-hi: #ecc766;
-  --accent-lo: #8a6d2a;
-  --accent-soft: rgba(209, 165, 60, 0.09);
-  --accent-line: rgba(209, 165, 60, 0.35);
-  --accent-ink: #0a0803;
-  --ok: #ecc766;
+  --bg: #0a0a0a;
+  --panel: #111111;
+  --panel-2: #161616;
+  --panel-3: #1f1f1f;
+  --line: #262626;
+  --line-2: #363636;
+  --text: #ededed;
+  --muted: #a3a3a3;
+  --dim: #6b6b6b;
+  --accent: #d4af37;
+  --accent-hi: #e2c158;
+  --accent-lo: #8c7324;
+  --accent-soft: rgba(212, 175, 55, 0.09);
+  --accent-line: rgba(212, 175, 55, 0.45);
+  --accent-ink: #0a0a0a;
+  --ok: #e2c158;
   --err: #c9553e;
   --warn: #d98e2b;
-  --info: #8f7a48;
-  --term-bg: #050504;
+  --info: #8f8f8f;
+  --term-bg: #0a0a0a;
+  --overlay: rgba(0, 0, 0, 0.75);
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
   --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r: 2px;
@@ -55,7 +56,7 @@ body {
 }
 
 input, textarea, select, button { font: inherit; color: inherit; }
-::selection { background: rgba(209, 165, 60, 0.32); color: #fff6df; }
+::selection { background: rgba(212, 175, 55, 0.32); color: #ffffff; }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: var(--line-2); border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent-lo); background-clip: padding-box; }
@@ -209,7 +210,7 @@ input, textarea, select, button { font: inherit; color: inherit; }
   white-space: nowrap;
   transition: border-color 0.12s, background 0.12s, color 0.12s;
 }
-.btn:hover:not(:disabled) { border-color: var(--accent-line); color: #fff6df; }
+.btn:hover:not(:disabled) { border-color: var(--accent-line); color: #ffffff; }
 .btn:active:not(:disabled) { background: var(--panel-3); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
@@ -382,7 +383,7 @@ input[type="range"] { accent-color: var(--accent); }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.broadcast-bar .btn { color: var(--accent-ink); border-color: rgba(10, 8, 3, 0.35); height: 20px; }
+.broadcast-bar .btn { color: var(--accent-ink); border-color: rgba(10, 10, 10, 0.35); height: 20px; }
 .broadcast-bar .btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ink); }
 
 /* ------------------------------------------------------------ Tables */
@@ -424,7 +425,7 @@ input[type="range"] { accent-color: var(--accent); }
 .dropzone {
   position: absolute; inset: 8px; z-index: 10;
   border: 1px dashed var(--accent);
-  background: rgba(8, 8, 7, 0.9);
+  background: rgba(10, 10, 10, 0.9);
   display: grid; place-items: center;
   color: var(--accent); font: 600 13px var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
   pointer-events: none;
@@ -486,7 +487,7 @@ input[type="range"] { accent-color: var(--accent); }
 
 .backdrop {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(3, 3, 2, 0.72);
+  background: var(--overlay);
   display: grid; place-items: center;
   animation: fade 0.12s ease-out;
 }
