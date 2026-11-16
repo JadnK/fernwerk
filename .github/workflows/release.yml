@@ -2,6 +2,12 @@ name: Release
 
 # Jeder Push auf main baut Fernwerk für alle Plattformen und
 # veröffentlicht (bzw. aktualisiert) das GitHub-Release v<version>.
+#
+# Ablauf:
+#   1. prepare – Release-Entwurf v<version> anlegen (oder vorhandenes wiederverwenden)
+#   2. build   – jede Plattform lädt nur ihre eigenen Dateien in diesen Entwurf
+#   3. publish – latest.json für den Updater erzeugen, Release veröffentlichen
+# So schreiben die parallelen Builds nie gleichzeitig an derselben Datei.
 on:
   push:
     branches: [main]
@@ -9,14 +15,30 @@ on:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
+  prepare:
+    name: Release vorbereiten
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: release
+        run: node .github/scripts/release.mjs prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     name: ${{ matrix.name }}
+    needs: prepare
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -72,19 +94,6 @@ jobs:
 
       - run: npm ci
 
-      # Abschnitt der aktuellen Version aus dem CHANGELOG – erscheint im Release und im Update-Popup
-      - name: Release-Notes
-        id: notes
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          NOTES=$(awk -v v="$VERSION" '$0 ~ "^## "v" " {f=1; next} /^## / {f=0} f' CHANGELOG.md)
-          {
-            echo "body<<FW_EOF"
-            echo "$NOTES"
-            echo "FW_EOF"
-          } >> "$GITHUB_OUTPUT"
-
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -95,23 +104,23 @@ jobs:
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: Fernwerk v__VERSION__
-          releaseBody: |
-            ${{ steps.notes.outputs.body }}
-
-            ### Downloads
-
-            | System | Datei |
-            |---|---|
-            | Windows | `.exe` (Installer) oder `.msi` |
-            | macOS Apple Silicon | `aarch64.dmg` |
-            | macOS Intel | `x64.dmg` |
-            | Linux | `.AppImage`, `.deb` oder `.rpm` (amd64 / arm64) |
-
-            Bereits installiert? Fernwerk meldet die neue Version selbst und installiert sie per Klick.
-          includeUpdaterJson: true
-          updaterJsonPreferNsis: true
-          releaseDraft: false
-          prerelease: false
+          releaseId: ${{ needs.prepare.outputs.id }}
+          # latest.json baut der publish-Job einmal für alle Plattformen
+          includeUpdaterJson: false
           args: ${{ matrix.args }}
+
+  publish:
+    name: Veröffentlichen
+    needs: [prepare, build]
+    # Auch veröffentlichen, wenn einzelne Plattformen fehlschlagen – die übrigen Dateien sind dann trotzdem da
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node .github/scripts/release.mjs publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.prepare.outputs.id }}
