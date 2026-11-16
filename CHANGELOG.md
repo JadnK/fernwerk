@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 – 2026-11-16
+
+- Überarbeitete Farbpalette
+- Konsolen: überflüssiges „+“ über der Konsolenliste entfernt
+
 ## 1.2.0 – 2026-11-16
 
 - Neues Design in Schwarz und Gold
