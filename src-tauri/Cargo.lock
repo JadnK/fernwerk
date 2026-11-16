@@ -1296,7 +1296,7 @@ dependencies = [
 
 [[package]]
 name = "fernwerk"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

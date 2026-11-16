@@ -620,13 +620,6 @@ input[type="range"] { accent-color: var(--accent); }
 }
 .state-btn:hover .console-state { transform: rotate(45deg) scale(1.4); }
 .state-btn.on .console-state { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--accent-line); }
-.sort-bar {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 8px 6px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel-2);
-  font: 11px var(--mono); color: var(--muted);
-}
 .console-state.up { background: var(--accent); border-color: var(--accent); }
 .console-state.crash { background: var(--err); border-color: var(--err); }
 
@@ -666,3 +659,30 @@ input[type="range"] { accent-color: var(--accent); }
 .host-card .row:last-child { margin-top: auto; }
 .btn.connect { color: var(--accent); border-color: var(--accent-line); }
 .btn.connect:hover:not(:disabled) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* Status-Filter oben in der Konsolenliste */
+.state-filter {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+  padding: 6px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+  position: sticky; top: 0; z-index: 1;
+}
+.state-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 6px 2px 5px; border: 1px solid transparent; border-radius: var(--r);
+  background: none; color: var(--muted); cursor: pointer; min-width: 0;
+}
+.state-chip:hover { background: var(--panel-3); color: var(--text); }
+.state-chip.on { background: var(--panel-3); border-color: var(--accent-line); color: var(--text); }
+.state-chip .console-state { width: 8px; height: 8px; }
+.state-chip:hover .console-state { transform: rotate(45deg) scale(1.25); }
+.chip-dots { display: flex; gap: 3px; height: 8px; align-items: center; }
+.chip-dots .console-state { width: 5px; height: 5px; }
+.chip-label { font-size: 10.5px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.chip-count { font: 600 12px var(--mono); line-height: 1; }
+.state-chip.on .chip-count { color: var(--accent-hi); }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+.console-hint {
+  padding: 8px 16px; border-bottom: 1px solid var(--line);
+  background: var(--panel-2); color: var(--muted); font-size: 12px; line-height: 1.5;
+}
+.console-hint b { color: var(--text); font-weight: 600; }

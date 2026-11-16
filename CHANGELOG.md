@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.3 – 2026-11-16
+
+- Konsolen: Status-Filter oben – Alle, Läuft, Abgestürzt, Beendet mit Anzahl; ein Klick auf eine Raute in der Liste filtert ebenfalls
+- Konsolen: Gameserver, die außerhalb von tmux/screen laufen (z.B. per start.sh, nohup oder systemd), werden jetzt erkannt
+- Für diese Server: Live-Log aus logs/latest.log bzw. dem Journal, Befehle per RCON, sauberes Stoppen, Spieleranzeige
+- „In Konsole übernehmen“: startet einen lose laufenden Server in tmux neu – danach volle Konsole mit Eingabe
+
 ## 1.2.2 – 2026-11-16
 
 - Konsolen: die Rauten sortieren jetzt die Konsolenliste
