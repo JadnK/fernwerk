@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { Copy, Download, FileUp, KeyRound, Pencil, Play, Plus, Server, Sparkles, Trash2 } from "lucide-react";
+import { Copy, Download, FileUp, KeyRound, Network, Pencil, Play, Plus, Server, Trash2 } from "lucide-react";
 import { api, errText } from "../lib/api";
-import { relative, unixDate } from "../lib/format";
+import { relative, tone, unixDate } from "../lib/format";
 import { ask, confirm, run, toast, useStore } from "../lib/store";
 import type { Settings } from "../lib/types";
 import { Empty, Field } from "./ui";
@@ -20,16 +20,36 @@ export function HomeView() {
 
   return (
     <div className="home">
-      <div className="row">
+      <div className="row" style={{ alignItems: "flex-end" }}>
         <div className="grow">
+          <div className="eyebrow">{new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</div>
           <h1>Übersicht</h1>
-          <div className="muted">
-            {vault.hosts.length} Hosts · {live} aktive Sitzung{live === 1 ? "" : "en"} · {vault.keys.length} Schlüssel
-          </div>
         </div>
+        <button className="btn" onClick={() => useStore.setState({ multiExec: "" })} disabled={live === 0} title="Einen Befehl auf mehreren verbundenen Hosts ausführen">
+          <Network size={14} /> Multi-Exec
+        </button>
         <button className="btn primary" onClick={() => useStore.setState({ editingHost: "new" })}>
           <Plus size={14} /> Neuer Host
         </button>
+      </div>
+
+      <div className="stat-strip">
+        <div>
+          <b>{vault.hosts.length}</b>
+          <span>Hosts</span>
+        </div>
+        <div>
+          <b>{live}</b>
+          <span>Verbunden</span>
+        </div>
+        <div>
+          <b>{vault.keys.length}</b>
+          <span>Schlüssel</span>
+        </div>
+        <div>
+          <b>{vault.snippets.length}</b>
+          <span>Snippets</span>
+        </div>
       </div>
 
       {hosts.length === 0 ? (
@@ -47,7 +67,7 @@ export function HomeView() {
           {hosts.map((h) => {
             const s = sessions.find((x) => x.hostId === h.id && x.status === "connected");
             return (
-              <div key={h.id} className="host-card" style={{ ["--card-color" as string]: h.color || undefined }}>
+              <div key={h.id} className="host-card" style={{ ["--card-color" as string]: tone(h.color) }}>
                 <div className="row">
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 600 }} className="ellipsis">
@@ -84,7 +104,7 @@ export function HomeView() {
                       Öffnen
                     </button>
                   ) : (
-                    <button className="btn sm primary wide" disabled={connecting[h.id]} onClick={() => connectHost(h.id)}>
+                    <button className="btn sm wide connect" disabled={connecting[h.id]} onClick={() => connectHost(h.id)}>
                       <Play size={12} /> {connecting[h.id] ? "Verbinde…" : "Verbinden"}
                     </button>
                   )}
@@ -165,7 +185,7 @@ export function KeysView() {
           <FileUp size={14} /> Importieren
         </button>
         <button className="btn primary" onClick={generate}>
-          <Sparkles size={14} /> Erzeugen
+          <Plus size={14} /> Erzeugen
         </button>
       </div>
       <div style={{ marginTop: 18 }}>
@@ -289,7 +309,8 @@ export function SettingsView() {
         <tbody>
           {[
             ["Strg + K", "Befehlspalette (im Terminal: Strg + Shift + K)"],
-            ["Strg + 1 … 7", "Werkzeug wechseln (im Terminal: Strg + Shift + 1 … 7)"],
+            ["Strg + 1 … 8", "Werkzeug wechseln (im Terminal: Strg + Shift + 1 … 8)"],
+            ["Strg + Shift + B", "Broadcast: in allen Shells gleichzeitig tippen"],
             ["Strg + Shift + T", "Neue Shell"],
             ["Strg + Tab", "Nächste Sitzung"],
             ["Strg + Shift + C / V", "Kopieren / Einfügen im Terminal"],

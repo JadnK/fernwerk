@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, KeyRound, LayoutGrid, Loader2, Pencil, Play, Plus, Search, Settings, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, KeyRound, LayoutGrid, Loader2, Network, Pencil, Play, Plus, Search, Settings, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
-import { fuzzy } from "../lib/format";
+import { fuzzy, tone } from "../lib/format";
+import { fillSnippet } from "../lib/snippets";
 import { ask, confirm, run, toast, useStore } from "../lib/store";
 import type { HostProfile, Snippet } from "../lib/types";
 import { sendToActiveTerminal } from "./TerminalPane";
@@ -40,8 +41,9 @@ export function Sidebar() {
       title: s ? "Snippet bearbeiten" : "Neues Snippet",
       fields: [
         { name: "name", label: "Name", value: s?.name ?? "" },
-        { name: "command", label: "Befehl", type: "textarea", value: s?.command ?? "", placeholder: "docker ps --format 'table {{.Names}}\\t{{.Status}}'" },
+        { name: "command", label: "Befehl", type: "textarea", value: s?.command ?? "", placeholder: "journalctl -u {{dienst:nginx}} -n {{zeilen:50}} --no-pager" },
       ],
+      message: "Platzhalter wie {{name}} oder {{name:Standard}} werden beim Ausführen abgefragt.",
       confirm: "Speichern",
     });
     if (!r || !String(r.command).trim()) return;
@@ -59,15 +61,17 @@ export function Sidebar() {
     });
   };
 
-  const runSnippet = (s: Snippet) => {
-    if (!sendToActiveTerminal(s.command.replace(/\n/g, "\r") + "\r")) toast("info", "Öffne zuerst eine Sitzung");
+  const runSnippet = async (s: Snippet) => {
+    const cmd = await fillSnippet(s.name, s.command);
+    if (cmd === null) return;
+    if (!sendToActiveTerminal(cmd.replace(/\n/g, "\r") + "\r")) toast("info", "Öffne zuerst eine Sitzung");
   };
 
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">&gt;_</div>
-        Fernwerk
+        <div className="brand-mark">F</div>
+        FERNWERK
       </div>
 
       <div className="search">
@@ -100,7 +104,7 @@ export function Sidebar() {
                   >
                     <span
                       className={`host-dot ${live ? "live" : ""}`}
-                      style={!live && h.color ? { background: h.color } : undefined}
+                      style={!live && h.color ? { borderColor: tone(h.color) } : undefined}
                     />
                     <div className="grow">
                       <div className="host-name ellipsis">{h.name}</div>
@@ -133,15 +137,20 @@ export function Sidebar() {
 
         {vault && vault.hosts.length === 0 && <div className="dim" style={{ padding: "8px 10px" }}>Noch keine Hosts angelegt.</div>}
 
-        <button className="btn ghost sm" style={{ margin: "6px 4px", width: "calc(100% - 8px)", justifyContent: "flex-start" }} onClick={() => useStore.setState({ editingHost: "new" })}>
+        <button className="btn ghost sm" style={{ margin: "6px 8px", width: "calc(100% - 16px)", justifyContent: "flex-start" }} onClick={() => useStore.setState({ editingHost: "new" })}>
           <Plus size={13} /> Host hinzufügen
         </button>
 
         <div className="side-section">
           <span>Snippets</span>
-          <button className="btn sm icon ghost" title="Neues Snippet" onClick={() => editSnippet()}>
-            <Plus size={13} />
-          </button>
+          <span className="row" style={{ gap: 0 }}>
+            <button className="btn sm icon ghost" title="Befehl auf mehreren Hosts ausführen" onClick={() => useStore.setState({ multiExec: "" })}>
+              <Network size={12} />
+            </button>
+            <button className="btn sm icon ghost" title="Neues Snippet" onClick={() => editSnippet()}>
+              <Plus size={13} />
+            </button>
+          </span>
         </div>
         {(vault?.snippets ?? []).map((s) => (
           <div key={s.id} className="snippet-item" title={s.command}>
@@ -152,18 +161,21 @@ export function Sidebar() {
               {s.name}
             </span>
             <div className="actions">
-              <button className="btn sm icon ghost" onClick={() => editSnippet(s)}>
+              <button className="btn sm icon ghost" title="Auf mehreren Hosts ausführen" onClick={() => useStore.setState({ multiExec: s.command })}>
+                <Network size={11} />
+              </button>
+              <button className="btn sm icon ghost" title="Bearbeiten" onClick={() => editSnippet(s)}>
                 <Pencil size={11} />
               </button>
-              <button className="btn sm icon ghost" onClick={() => deleteSnippet(s)}>
+              <button className="btn sm icon ghost" title="Löschen" onClick={() => deleteSnippet(s)}>
                 <Trash2 size={11} />
               </button>
             </div>
           </div>
         ))}
         {vault && vault.snippets.length === 0 && (
-          <div className="dim" style={{ padding: "4px 10px", fontSize: 12 }}>
-            Häufige Befehle speichern und mit einem Klick ins Terminal schicken.
+          <div className="dim" style={{ padding: "4px 14px", fontSize: 12 }}>
+            Häufige Befehle speichern und mit einem Klick ins Terminal schicken – mit Platzhaltern wie {"{{dienst}}"}.
           </div>
         )}
       </div>

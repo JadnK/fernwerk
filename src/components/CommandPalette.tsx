@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Code2, KeyRound, LayoutGrid, Plus, Server, Settings } from "lucide-react";
+import { Code2, Columns2, KeyRound, LayoutGrid, Network, Plus, Radio, Server, Settings } from "lucide-react";
 import { fuzzy } from "../lib/format";
+import { fillSnippet } from "../lib/snippets";
 import { toast, useStore } from "../lib/store";
 import { TOOLS } from "./SessionView";
 import { sendToActiveTerminal } from "./TerminalPane";
@@ -54,9 +55,34 @@ export function CommandPalette() {
         label: `Snippet: ${s.name}`,
         hint: s.command.split("\n")[0].slice(0, 40),
         icon: <Code2 size={14} className="muted" />,
-        run: () => {
-          if (!sendToActiveTerminal(s.command.replace(/\n/g, "\r") + "\r")) toast("info", "Keine aktive Shell");
+        run: async () => {
+          const cmd = await fillSnippet(s.name, s.command);
+          if (cmd === null) return;
+          if (!sendToActiveTerminal(cmd.replace(/\n/g, "\r") + "\r")) toast("info", "Keine aktive Shell");
         },
+      });
+    }
+    list.push(
+      {
+        id: "multi",
+        label: "Befehl auf mehreren Hosts ausführen…",
+        icon: <Network size={14} className="muted" />,
+        run: () => useStore.setState({ multiExec: "" }),
+      },
+      {
+        id: "broadcast",
+        label: st.broadcast ? "Broadcast beenden" : "Broadcast: in allen Shells gleichzeitig tippen",
+        hint: "Strg+Shift+B",
+        icon: <Radio size={14} className="muted" />,
+        run: () => useStore.setState({ broadcast: !useStore.getState().broadcast }),
+      },
+    );
+    if (active) {
+      list.push({
+        id: "split",
+        label: "Terminal teilen / zusammenführen",
+        icon: <Columns2 size={14} className="muted" />,
+        run: () => st.toggleSplit(active),
       });
     }
     list.push(
@@ -66,7 +92,7 @@ export function CommandPalette() {
       { id: "settings", label: "Einstellungen", icon: <Settings size={14} className="muted" />, run: () => st.setView("settings") },
     );
     return list;
-  }, [vault, sessions, active]);
+  }, [vault, sessions, active, open]);
 
   const filtered = useMemo(() => items.filter((i) => !q || fuzzy(`${i.label} ${i.hint ?? ""}`, q)).slice(0, 50), [items, q]);
 

@@ -198,4 +198,4 @@ export interface AuthorizedKey {
   fingerprint: string;
 }
 
-export type Tool = "terminal" | "files" | "monitor" | "services" | "tunnels" | "users" | "access";
+export type Tool = "terminal" | "files" | "monitor" | "services" | "consoles" | "tunnels" | "users" | "access";

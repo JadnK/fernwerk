@@ -10,32 +10,36 @@ import { b64ToBytes } from "../lib/format";
 import { useStore, type TermTab } from "../lib/store";
 import type { Settings, TermEvent } from "../lib/types";
 
+// Schwarz & Gold. Die ANSI-Farben bleiben unterscheidbar, sind aber warm und entsättigt,
+// damit `ls`, `git diff` & Co. nicht wie ein Fremdkörper im Fenster wirken.
 const THEME = {
-  background: "#0b0d10",
-  foreground: "#d9dde3",
-  cursor: "#e8a33d",
-  cursorAccent: "#0b0d10",
-  selectionBackground: "rgba(232,163,61,0.28)",
-  black: "#1b1f24",
-  red: "#e06c62",
-  green: "#7cbf8e",
-  yellow: "#d9b44a",
-  blue: "#6aa6d8",
-  magenta: "#c08ad6",
-  cyan: "#5fb8b3",
-  white: "#c9ced6",
-  brightBlack: "#5d656f",
-  brightRed: "#f08a80",
-  brightGreen: "#9ad6a9",
-  brightYellow: "#ecc865",
-  brightBlue: "#8cbde6",
-  brightMagenta: "#d4a6e6",
-  brightCyan: "#7fd0cb",
-  brightWhite: "#f2f4f7",
+  background: "#050504",
+  foreground: "#e6dcc4",
+  cursor: "#d1a53c",
+  cursorAccent: "#050504",
+  selectionBackground: "rgba(209,165,60,0.30)",
+  black: "#1b1914",
+  red: "#c9553e",
+  green: "#a5ad6b",
+  yellow: "#d1a53c",
+  blue: "#8a98a8",
+  magenta: "#b48c8f",
+  cyan: "#92a894",
+  white: "#d2c7ad",
+  brightBlack: "#6b604a",
+  brightRed: "#e07a5f",
+  brightGreen: "#c4cb8a",
+  brightYellow: "#ecc766",
+  brightBlue: "#aab6c4",
+  brightMagenta: "#d0a9a9",
+  brightCyan: "#b2c6b2",
+  brightWhite: "#fff6df",
 };
 
 /** termKey -> Funktion zum Schreiben in die Shell (für Snippets & Palette) */
 const writers = new Map<string, (text: string) => void>();
+/** termKey -> schreibt nur in die Shell, ohne Fokus (für Broadcast) */
+const rawWriters = new Map<string, (text: string) => void>();
 
 export function sendToActiveTerminal(text: string): boolean {
   const { sessions, active } = useStore.getState();
@@ -52,15 +56,22 @@ export function TerminalPane({
   connId,
   tab,
   visible,
+  focused,
   settings,
   onTitle,
+  onFocus,
 }: {
   connId: string;
   tab: TermTab;
   visible: boolean;
+  /** Diese Shell soll den Tastaturfokus bekommen */
+  focused: boolean;
   settings: Settings;
   onTitle: (title: string) => void;
+  onFocus: () => void;
 }) {
+  const onFocusRef = useRef(onFocus);
+  onFocusRef.current = onFocus;
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -157,7 +168,15 @@ export function TerminalPane({
       return true;
     });
 
-    term.onData(send);
+    rawWriters.set(tab.key, send);
+    term.onData((data) => {
+      send(data);
+      // Broadcast: dieselben Tasten an alle anderen offenen Shells
+      if (useStore.getState().broadcast) {
+        for (const [key, w] of rawWriters) if (key !== tab.key) w(data);
+      }
+    });
+    term.textarea?.addEventListener("focus", () => onFocusRef.current());
     term.onTitleChange((t) => onTitleRef.current(t));
     term.onSelectionChange(() => {
       if (settings.copyOnSelect) {
@@ -216,6 +235,7 @@ export function TerminalPane({
       hostEl.removeEventListener("contextmenu", onContext);
       ro.disconnect();
       writers.delete(tab.key);
+      rawWriters.delete(tab.key);
       if (termIdRef.current) api.termClose(connId, termIdRef.current);
       term.dispose();
     };
@@ -246,10 +266,10 @@ export function TerminalPane({
       } catch {
         /* ignore */
       }
-      termRef.current?.focus();
+      if (focused) termRef.current?.focus();
     }, 20);
     return () => clearTimeout(t);
-  }, [visible]);
+  }, [visible, focused]);
 
   const find = (dir: 1 | -1) => {
     if (!query) return;

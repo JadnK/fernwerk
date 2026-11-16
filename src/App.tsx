@@ -5,6 +5,7 @@ import { LayoutGrid, Plus, X } from "lucide-react";
 import { CommandPalette } from "./components/CommandPalette";
 import { HomeView, KeysView, SettingsView } from "./components/Home";
 import { HostEditor } from "./components/HostEditor";
+import { MultiExec } from "./components/MultiExec";
 import { SessionView, TOOLS } from "./components/SessionView";
 import { Sidebar } from "./components/Sidebar";
 import { DialogHost, Toasts } from "./components/ui";
@@ -124,6 +125,13 @@ export default function App() {
         st.setActive(st.sessions[n].id);
         return;
       }
+      if (e.shiftKey && e.code === "KeyB") {
+        e.preventDefault();
+        e.stopPropagation(); // xterm soll das Kürzel nicht zusätzlich an die Shell senden
+        useStore.setState({ broadcast: !st.broadcast });
+        toast("info", st.broadcast ? "Broadcast beendet" : "Broadcast: Eingabe geht an alle offenen Shells");
+        return;
+      }
       if (!st.active) return;
       // e.code statt e.key, damit Strg+Shift+1 nicht zu „!“ wird
       const tool = TOOLS.find((t) => e.code === `Digit${t.key}` && e.shiftKey === inTerminal);
@@ -213,6 +221,7 @@ export default function App() {
         <HostEditor host={editingHost === "new" ? null : editingHost} onClose={() => useStore.setState({ editingHost: null })} />
       )}
       <UpdateDialog />
+      <MultiExec />
       <CommandPalette />
       <DialogHost />
       <Toasts />

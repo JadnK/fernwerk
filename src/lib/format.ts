@@ -49,6 +49,22 @@ export function relative(sec: number | null | undefined): string {
   return `vor ${Math.floor(diff / 86400)} T`;
 }
 
+/** Ältere Hostfarben (bunt) auf die Gold-Palette abbilden. */
+const LEGACY_COLORS: Record<string, string> = {
+  "#e8a33d": "#d1a53c",
+  "#e06c62": "#c9553e",
+  "#5fb37c": "#a8822e",
+  "#6aa6d8": "#b8a47a",
+  "#c08ad6": "#efe2bf",
+  "#5fb8b3": "#7a5f22",
+  "#d9b44a": "#ecc766",
+};
+
+export function tone(color: string | undefined | null): string | undefined {
+  if (!color) return undefined;
+  return LEGACY_COLORS[color.toLowerCase()] ?? color;
+}
+
 export function uid(): string {
   return crypto.randomUUID();
 }

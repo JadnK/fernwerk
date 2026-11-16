@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0 – 2026-11-16
+
+- Neues Design in Schwarz und Gold
+- Neues Werkzeug „Konsolen“ (`Strg+8`): Gameserver und andere Dauerläufer in tmux betreiben – Live-Konsole, Befehle senden, sauber stoppen, Auto-Neustart, Start beim Hochfahren
+- Minecraft-Vorlage mit Schnellbefehlen, Spieleranzeige und EULA-Hinweis; Vorlagen für Bedrock, Terraria, Factorio und Node/Python
+- Vorhandene tmux-Sitzungen und Docker-Container in den Konsolen anzeigen und steuern
+- Terminal: geteilte Ansicht mit zwei Shells nebeneinander
+- Broadcast (`Strg+Shift+B`): Eingabe geht an alle offenen Shells
+- Snippets mit Platzhaltern (`{{name}}`, `{{name:Standard}}`)
+- Multi-Exec: einen Befehl auf mehreren verbundenen Hosts gleichzeitig ausführen
+
 ## 1.1.2 – 2026-10-23
 
 - Terminal: Strg-Kürzel gehen an die Shell (nano, bash, vim) statt an Fernwerk – z.B. Strg+K schneidet in nano wieder die Zeile aus

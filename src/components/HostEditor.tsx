@@ -6,7 +6,8 @@ import { attempt, confirm, run, useStore } from "../lib/store";
 import type { HostProfile } from "../lib/types";
 import { Field, Modal } from "./ui";
 
-export const COLORS = ["", "#e8a33d", "#e06c62", "#5fb37c", "#6aa6d8", "#c08ad6", "#5fb8b3", "#d9b44a"];
+/** Markierungsfarben – nur Gold-Abstufungen, passend zum zweifarbigen Design. */
+export const COLORS = ["", "#ecc766", "#d1a53c", "#a8822e", "#7a5f22", "#efe2bf", "#b8a47a", "#c9553e"];
 
 const empty = (): HostProfile => ({
   id: "",

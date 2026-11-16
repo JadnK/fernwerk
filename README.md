@@ -9,7 +9,10 @@ Läuft auf Windows, macOS und Linux.
 **Terminal**
 - Mehrere Shells pro Verbindung (gleiche SSH-Session, kein erneuter Login)
 - xterm-256color, Truecolor, Suche im Scrollback (`Strg+Shift+F`)
-- Snippets: häufige Befehle speichern und per Klick oder `Strg+K` ausführen
+- Geteilte Ansicht: zwei Shells nebeneinander
+- Broadcast (`Strg+Shift+B`): in allen offenen Shells gleichzeitig tippen
+- Snippets: häufige Befehle speichern und per Klick oder `Strg+K` ausführen, mit Platzhaltern wie `{{dienst:nginx}}`
+- Multi-Exec: einen Befehl auf mehreren verbundenen Hosts ausführen und die Ausgaben vergleichen
 - Startbefehl pro Host (z.B. `cd /var/www && git status`)
 
 **Dateien (SFTP)**
@@ -29,6 +32,15 @@ Läuft auf Windows, macOS und Linux.
 - Alle systemd-Units mit Status und Autostart
 - Starten, Stoppen, Neustarten, Aktivieren/Deaktivieren
 - `journalctl`-Logs pro Dienst
+
+**Konsolen (Gameserver & Dauerläufer)**
+- Minecraft (Java/Bedrock), Terraria, Factorio, Node/Python-Bots oder eigene Befehle dauerhaft auf dem Server betreiben
+- Live-Konsole mit Befehlseingabe, Verlauf und Schnellbefehlen (`list`, `save-all`, `say …`)
+- Starten, sauber Stoppen (z.B. `stop` statt Kill), Neustarten, Laufzeit, CPU und RAM des Prozesses
+- Auto-Neustart nach Absturz, Start beim Hochfahren (crontab `@reboot`)
+- Minecraft: Spieleranzeige, EULA mit einem Klick, Server-JAR per URL laden
+- Läuft in tmux weiter, wenn Fernwerk geschlossen ist – jederzeit auch per `tmux attach` im Terminal
+- Vorhandene tmux-Sitzungen und Docker-Container (Logs, Start/Stopp, `docker exec`) im selben Fenster
 
 **Tunnel**
 - Local Forward (`-L`) und SOCKS5-Proxy (`-D`)

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api, errText } from "./api";
-import { uid } from "./format";
+import { tone, uid } from "./format";
 import type { HostProfile, Tool, VaultData } from "./types";
 
 export interface TermTab {
@@ -21,6 +21,8 @@ export interface Session {
   tool: Tool;
   terminals: TermTab[];
   activeTerm: string | null;
+  /** Zweite, daneben angezeigte Shell (geteilte Ansicht) */
+  splitTerm: string | null;
   sudoPassword?: string;
 }
 
@@ -80,6 +82,10 @@ interface State {
   navBack: NavEntry[];
   navFwd: NavEntry[];
   update: UpdateInfo | null;
+  /** Tastatureingaben gehen an alle offenen Shells aller Sitzungen */
+  broadcast: boolean;
+  /** Offener Dialog „Auf mehreren Hosts ausführen“ (vorbelegter Befehl) */
+  multiExec: string | null;
 
   reloadVault: () => Promise<void>;
   setView: (v: View) => void;
@@ -88,6 +94,10 @@ interface State {
   updateSession: (id: string, patch: Partial<Session>) => void;
   addTerminal: (sessionId: string, startup?: string) => void;
   closeTerminal: (sessionId: string, key: string) => void;
+  /** Geteilte Ansicht an/aus */
+  toggleSplit: (sessionId: string) => void;
+  /** Eine Shell in den Vordergrund holen (tauscht bei geteilter Ansicht die Seiten) */
+  focusTerminal: (sessionId: string, key: string) => void;
   connectHost: (hostId: string) => Promise<void>;
   disconnect: (sessionId: string) => Promise<void>;
   reconnect: (sessionId: string) => Promise<void>;
@@ -125,6 +135,8 @@ export const useStore = create<State>((set, get) => {
   navBack: [],
   navFwd: [],
   update: null,
+  broadcast: false,
+  multiExec: null,
 
   reloadVault: async () => {
     set({ vault: await api.vaultLoad() });
@@ -178,9 +190,33 @@ export const useStore = create<State>((set, get) => {
     const s = get().sessions.find((x) => x.id === sessionId);
     if (!s) return;
     const terminals = s.terminals.filter((t) => t.key !== key);
+    let { activeTerm, splitTerm } = s;
+    if (splitTerm === key) splitTerm = null;
+    if (activeTerm === key) {
+      activeTerm = splitTerm ?? terminals[terminals.length - 1]?.key ?? null;
+      splitTerm = null;
+    }
+    get().updateSession(sessionId, { terminals, activeTerm, splitTerm });
+  },
+
+  toggleSplit: (sessionId) => {
+    const s = get().sessions.find((x) => x.id === sessionId);
+    if (!s) return;
+    if (s.splitTerm) return get().updateSession(sessionId, { splitTerm: null });
+    const other = s.terminals.find((t) => t.key !== s.activeTerm);
+    if (other) return get().updateSession(sessionId, { splitTerm: other.key, tool: "terminal" });
+    // Nur eine Shell offen: eine neue daneben öffnen
+    const prev = s.activeTerm;
+    get().addTerminal(sessionId);
+    get().updateSession(sessionId, { splitTerm: prev });
+  },
+
+  focusTerminal: (sessionId, key) => {
+    const s = get().sessions.find((x) => x.id === sessionId);
+    if (!s || s.activeTerm === key) return;
     get().updateSession(sessionId, {
-      terminals,
-      activeTerm: s.activeTerm === key ? (terminals[terminals.length - 1]?.key ?? null) : s.activeTerm,
+      activeTerm: key,
+      splitTerm: s.splitTerm === key ? s.activeTerm : s.splitTerm,
     });
   },
 
@@ -212,11 +248,12 @@ export const useStore = create<State>((set, get) => {
             label: host.name,
             username: info.username,
             host: host.host,
-            color: host.color,
+            color: tone(host.color) ?? "",
             status: "connected",
             tool: "terminal",
             terminals: [{ key: uid(), title: "Shell 1", startup: host.startupCommand || undefined }],
             activeTerm: null,
+            splitTerm: null,
           };
           session.activeTerm = session.terminals[0].key;
           withNav(() => set((s) => ({ sessions: [...s.sessions, session], active: session.id })));

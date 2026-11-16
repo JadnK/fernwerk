@@ -2,7 +2,7 @@ import { useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { Download, Sparkles } from "lucide-react";
+import { ArrowUpCircle, Download } from "lucide-react";
 import { errText } from "../lib/api";
 import { bytes } from "../lib/format";
 import { toast, useStore } from "../lib/store";
@@ -119,7 +119,7 @@ export function UpdateDialog() {
   return (
     <Modal
       title={`Fernwerk ${info.version} ist verfügbar`}
-      icon={<Sparkles size={16} style={{ color: "var(--accent)" }} />}
+      icon={<ArrowUpCircle size={16} style={{ color: "var(--accent)" }} />}
       onClose={close}
       footer={
         <>

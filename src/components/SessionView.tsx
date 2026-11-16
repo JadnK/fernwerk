@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import {
   Activity,
   ArrowRightLeft,
+  Columns2,
   FolderTree,
+  Gamepad2,
+  Radio,
   KeyRound,
   Plus,
   RotateCw,
@@ -15,6 +18,7 @@ import {
 import { useStore, type Session } from "../lib/store";
 import type { Tool } from "../lib/types";
 import { Access } from "./Access";
+import { Consoles } from "./Consoles";
 import { FileBrowser } from "./FileBrowser";
 import { Monitor } from "./Monitor";
 import { Services } from "./Services";
@@ -27,6 +31,7 @@ export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: strin
   { id: "files", label: "Dateien", icon: FolderTree, key: "2" },
   { id: "monitor", label: "Monitor", icon: Activity, key: "3" },
   { id: "services", label: "Dienste", icon: Server, key: "4" },
+  { id: "consoles", label: "Konsolen", icon: Gamepad2, key: "8" },
   { id: "tunnels", label: "Tunnel", icon: ArrowRightLeft, key: "5" },
   { id: "users", label: "Benutzer", icon: UsersIcon, key: "6" },
   { id: "access", label: "SSH-Keys", icon: KeyRound, key: "7" },
@@ -34,7 +39,8 @@ export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: strin
 
 export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
   const settings = useStore((s) => s.vault?.settings);
-  const { setTool, addTerminal, closeTerminal, updateSession, reconnect } = useStore.getState();
+  const broadcast = useStore((s) => s.broadcast);
+  const { setTool, addTerminal, closeTerminal, reconnect, toggleSplit, focusTerminal } = useStore.getState();
   const [mounted, setMounted] = useState<Set<Tool>>(new Set(["terminal"]));
   const [titles, setTitles] = useState<Record<string, string>>({});
 
@@ -79,12 +85,21 @@ export function SessionView({ session, visible }: { session: Session; visible: b
 
       {/* Terminal */}
       <div className={`pane ${show("terminal") ? "" : "hidden"}`}>
+        {broadcast && (
+          <div className="broadcast-bar">
+            <Radio size={13} />
+            <span className="grow">Broadcast – Eingabe geht an alle offenen Shells</span>
+            <button className="btn sm" onClick={() => useStore.setState({ broadcast: false })}>
+              Beenden
+            </button>
+          </div>
+        )}
         <div className="term-tabs">
           {session.terminals.map((t) => (
             <div
               key={t.key}
-              className={`term-tab ${session.activeTerm === t.key ? "on" : ""}`}
-              onClick={() => updateSession(session.id, { activeTerm: t.key })}
+              className={`term-tab ${session.activeTerm === t.key ? "on" : session.splitTerm === t.key ? "split" : ""}`}
+              onClick={() => focusTerminal(session.id, t.key)}
               onAuxClick={(e) => e.button === 1 && closeTerminal(session.id, t.key)}
             >
               <span className="ellipsis">{titles[t.key] || t.title}</span>
@@ -108,6 +123,22 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           >
             <Plus size={14} />
           </button>
+          <span className="spacer" />
+          <button
+            className={`btn sm ghost ${session.splitTerm ? "on" : ""}`}
+            title="Zwei Shells nebeneinander"
+            disabled={closed}
+            onClick={() => toggleSplit(session.id)}
+          >
+            <Columns2 size={13} /> Teilen
+          </button>
+          <button
+            className={`btn sm ghost ${broadcast ? "on" : ""}`}
+            title="In allen offenen Shells gleichzeitig tippen (Strg+Shift+B)"
+            onClick={() => useStore.setState({ broadcast: !broadcast })}
+          >
+            <Radio size={13} /> Broadcast
+          </button>
         </div>
         {session.terminals.length === 0 && (
           <div className="empty">
@@ -116,17 +147,21 @@ export function SessionView({ session, visible }: { session: Session; visible: b
             </button>
           </div>
         )}
-        {!closed &&
-          session.terminals.map((t) => (
-            <TerminalPane
-              key={t.key}
-              connId={session.id}
-              tab={t}
-              settings={settings}
-              visible={show("terminal") && session.activeTerm === t.key}
-              onTitle={(title) => setTitles((x) => ({ ...x, [t.key]: title }))}
-            />
-          ))}
+        <div className="term-split" style={session.terminals.length === 0 ? { display: "none" } : undefined}>
+          {!closed &&
+            session.terminals.map((t) => (
+              <TerminalPane
+                key={t.key}
+                connId={session.id}
+                tab={t}
+                settings={settings}
+                visible={show("terminal") && (session.activeTerm === t.key || session.splitTerm === t.key)}
+                focused={show("terminal") && session.activeTerm === t.key}
+                onFocus={() => focusTerminal(session.id, t.key)}
+                onTitle={(title) => setTitles((x) => ({ ...x, [t.key]: title }))}
+              />
+            ))}
+        </div>
       </div>
 
       {!closed && (
@@ -144,6 +179,11 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           {mounted.has("services") && (
             <div className={`pane ${show("services") ? "" : "hidden"}`}>
               <Services sessionId={session.id} connId={session.id} visible={show("services")} />
+            </div>
+          )}
+          {mounted.has("consoles") && (
+            <div className={`pane ${show("consoles") ? "" : "hidden"}`}>
+              <Consoles sessionId={session.id} connId={session.id} visible={show("consoles")} />
             </div>
           )}
           {mounted.has("tunnels") && (
