@@ -612,7 +612,21 @@ input[type="range"] { accent-color: var(--accent); }
 .console-item:hover { background: var(--panel-2); }
 .console-item.on { background: var(--panel-3); border-left-color: var(--accent); }
 .console-item .sub { font: 11px var(--mono); color: var(--dim); }
-.console-state { width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid var(--dim); flex-shrink: 0; }
+.console-state { width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid var(--dim); flex-shrink: 0; transition: transform 0.12s; }
+.state-btn {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 17px; height: 17px; margin: 0 -5px; padding: 0;
+  background: none; border: 0; cursor: pointer;
+}
+.state-btn:hover .console-state { transform: rotate(45deg) scale(1.4); }
+.state-btn.on .console-state { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--accent-line); }
+.sort-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+  font: 11px var(--mono); color: var(--muted);
+}
 .console-state.up { background: var(--accent); border-color: var(--accent); }
 .console-state.crash { background: var(--err); border-color: var(--err); }
 
@@ -643,12 +657,6 @@ input[type="range"] { accent-color: var(--accent); }
 .console-input input { flex: 1; height: 40px; border: 0; outline: 0; background: transparent; font: 13px var(--mono); color: var(--text); user-select: text; }
 .console-input .btn { margin-right: 8px; }
 
-.preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
-.preset { background: var(--panel); padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; border-left: 2px solid transparent; }
-.preset:hover { background: var(--panel-2); }
-.preset.on { border-left-color: var(--accent); background: var(--panel-3); }
-.preset b { font-weight: 500; }
-.preset span { font-size: 11px; color: var(--dim); }
 
 .result-block { border: 1px solid var(--line); background: var(--panel); }
 .result-block + .result-block { border-top: 0; }
