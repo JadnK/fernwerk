@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2 – 2026-11-16
+
+- Konsolen: die Rauten sortieren jetzt die Konsolenliste
+- Releases werden wieder zuverlässig veröffentlicht, das Update-Popup erscheint wieder
+
 ## 1.2.1 – 2026-11-16
 
 - Überarbeitete Farbpalette
