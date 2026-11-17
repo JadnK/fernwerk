@@ -119,11 +119,14 @@ export const api = {
     update: { name: string; fullName?: string; shell?: string; groups?: string[] },
     sudoPassword: Sudo,
   ) => invoke<void>("user_update", { connId, update, sudoPassword: sudoPassword ?? null }),
+  userAuthorizeKey: (connId: string, name: string, publicKey: string, sudoPassword: Sudo) =>
+    invoke<boolean>("user_authorize_key", { connId, name, publicKey, sudoPassword: sudoPassword ?? null }),
   groupCreate: (connId: string, name: string, sudoPassword: Sudo) =>
     invoke<void>("group_create", { connId, name, sudoPassword: sudoPassword ?? null }),
 
   // Schlüssel
-  keysGenerate: (name: string, comment: string) => invoke<KeyEntry>("keys_generate", { name, comment }),
+  keysGenerate: (name: string, comment: string, passphrase?: string, location?: "ssh" | "app") =>
+    invoke<KeyEntry>("keys_generate", { name, comment, passphrase: passphrase || null, location: location ?? null }),
   keysImport: (name: string, path: string, passphrase?: string) =>
     invoke<KeyEntry>("keys_import", { name, path, passphrase: passphrase ?? null }),
   keysDelete: (id: string, deleteFile: boolean) => invoke<void>("keys_delete", { id, deleteFile }),

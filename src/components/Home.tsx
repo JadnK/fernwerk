@@ -113,12 +113,26 @@ export function KeysView() {
       fields: [
         { name: "name", label: "Name", value: "fernwerk-ed25519" },
         { name: "comment", label: "Kommentar", value: "fernwerk" },
+        { name: "pass1", label: "Passphrase (empfohlen, leer = ohne)", type: "password" },
+        { name: "pass2", label: "Passphrase wiederholen", type: "password" },
+        {
+          name: "location",
+          label: "Speichern in",
+          type: "select",
+          options: [
+            { value: "app", label: "Fernwerk-Schlüsselordner" },
+            { value: "ssh", label: "~/.ssh auf diesem PC" },
+          ],
+        },
       ],
       confirm: "Erzeugen",
     });
     if (!r) return;
+    const pass = String(r.pass1 ?? "");
+    if (pass !== String(r.pass2 ?? "")) return toast("error", "Die Passphrasen stimmen nicht überein");
+    if (pass && pass.length < 8) return toast("error", "Passphrase: mindestens 8 Zeichen");
     await run(async () => {
-      await api.keysGenerate(String(r.name).trim() || "key", String(r.comment));
+      await api.keysGenerate(String(r.name).trim() || "key", String(r.comment), pass, r.location === "ssh" ? "ssh" : "app");
       await reloadVault();
     }, "Schlüssel erzeugt");
   };

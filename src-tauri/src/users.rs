@@ -397,6 +397,54 @@ pub async fn user_update(
     Ok(())
 }
 
+/// Trägt einen Public Key in `~<user>/.ssh/authorized_keys` ein.
+/// Legt `.ssh` (700) und die Datei (600) bei Bedarf an, setzt den Besitzer und hängt den Schlüssel
+/// immer in einer eigenen Zeile an. Liefert `false`, wenn der Schlüssel schon eingetragen war.
+#[tauri::command]
+pub async fn user_authorize_key(
+    state: State<'_, AppState>,
+    conn_id: String,
+    name: String,
+    public_key: String,
+    sudo_password: Option<String>,
+) -> AppResult<bool> {
+    if !valid_name(&name) {
+        return Err(AppError::msg("Ungültiger Benutzername"));
+    }
+    crate::keys::validate_pubkey(&public_key)?;
+    let key = public_key.trim();
+    if key.contains('\n') {
+        return Err(AppError::msg("Ungültiger Public Key"));
+    }
+    let n = sh_quote(&name);
+    let k = sh_quote(key);
+    let script = format!(
+        "set -e; \
+         H=$(getent passwd {n} | cut -d: -f6); \
+         [ -n \"$H\" ] && [ -d \"$H\" ] || {{ echo 'Home-Verzeichnis von {name} nicht gefunden' >&2; exit 1; }}; \
+         G=$(id -gn {n}); \
+         D=\"$H/.ssh\"; F=\"$D/authorized_keys\"; \
+         [ -d \"$D\" ] || mkdir -m 700 \"$D\"; \
+         [ -f \"$F\" ] || {{ touch \"$F\"; chmod 600 \"$F\"; }}; \
+         if grep -qxF {k} \"$F\"; then R=EXISTS; else \
+           if [ -s \"$F\" ] && [ -n \"$(tail -c1 \"$F\")\" ]; then echo >> \"$F\"; fi; \
+           printf '%s\\n' {k} >> \"$F\"; R=ADDED; fi; \
+         chown {n}:\"$G\" \"$D\" \"$F\"; chmod 700 \"$D\"; chmod 600 \"$F\"; \
+         echo $R"
+    );
+    let conn = state.conn(&conn_id).await?;
+    let out = if name == conn.username {
+        conn.exec(&format!("sh -c {}", sh_quote(&script)), None)
+            .await?
+            .check()?
+    } else {
+        conn.exec_root(&script, sudo_password, None)
+            .await?
+            .check()?
+    };
+    Ok(out.stdout.contains("ADDED"))
+}
+
 #[tauri::command]
 pub async fn group_create(
     state: State<'_, AppState>,

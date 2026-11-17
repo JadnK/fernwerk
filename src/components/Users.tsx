@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { KeyRound, Lock, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Unlock, UserPlus, Users as UsersIcon } from "lucide-react";
+import { KeyRound, KeySquare, Lock, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Unlock, UserPlus, Users as UsersIcon } from "lucide-react";
 import { api, errText } from "../lib/api";
 import { ask, attempt, run, toast, useStore, withSudo } from "../lib/store";
 import type { UserInfo, UsersOverview } from "../lib/types";
@@ -61,6 +61,100 @@ export function Users({ sessionId, connId, visible }: { sessionId: string; connI
     if (!r) return;
     await run(() => sudo((pw) => api.userDelete(connId, u.name, !!r.home, pw)), `${u.name} gelöscht`);
     load();
+  };
+
+  /**
+   * Schlüssel für einen Server-Benutzer: Das Paar entsteht auf diesem PC (der private Schlüssel bleibt hier),
+   * der öffentliche Schlüssel wird beim Benutzer in ~/.ssh/authorized_keys eingetragen.
+   */
+  const setupKey = async (u: UserInfo) => {
+    const st = useStore.getState();
+    const session = st.sessions.find((x) => x.id === sessionId);
+    const host = st.vault?.hosts.find((h) => h.id === session?.hostId);
+    const keys = st.vault?.keys ?? [];
+    const server = host?.host ?? "server";
+    const r = await ask({
+      title: `SSH-Schlüssel für ${u.name}`,
+      message: `Das Schlüsselpaar wird auf diesem PC erzeugt. Der private Schlüssel bleibt bei dir, der öffentliche Schlüssel wird auf dem Server in ~${u.name}/.ssh/authorized_keys eingetragen (Ordner und Datei werden bei Bedarf angelegt).`,
+      fields: [
+        {
+          name: "key",
+          label: "Schlüssel",
+          type: "select",
+          options: [
+            { value: "new", label: "Neuen Schlüssel erzeugen (Ed25519)" },
+            ...keys.map((k) => ({ value: k.id, label: `Vorhandenen eintragen: ${k.name}` })),
+          ],
+        },
+        { name: "name", label: "Name des neuen Schlüssels", value: `${u.name}@${server}` },
+        { name: "pass1", label: "Passphrase (empfohlen, leer = ohne)", type: "password" },
+        { name: "pass2", label: "Passphrase wiederholen", type: "password" },
+        {
+          name: "location",
+          label: "Privaten Schlüssel speichern in",
+          type: "select",
+          options: [
+            { value: "ssh", label: "~/.ssh auf diesem PC" },
+            { value: "app", label: "Fernwerk-Schlüsselordner" },
+          ],
+        },
+        ...(host
+          ? [{ name: "profile", label: `Host-Eintrag „${host.name} (${u.name})“ mit diesem Schlüssel anlegen`, type: "checkbox" as const, value: true }]
+          : []),
+        { name: "savePass", label: "Passphrase im Fernwerk-Tresor speichern (sonst Abfrage beim Verbinden)", type: "checkbox", value: false },
+      ],
+      confirm: "Erstellen & eintragen",
+    });
+    if (!r) return;
+
+    const isNew = r.key === "new";
+    const pass = String(r.pass1 ?? "");
+    if (isNew && pass !== String(r.pass2 ?? "")) return toast("error", "Die Passphrasen stimmen nicht überein");
+    if (isNew && pass && pass.length < 8) return toast("error", "Passphrase: mindestens 8 Zeichen");
+
+    await run(async () => {
+      const key = isNew
+        ? await api.keysGenerate(String(r.name).trim() || `${u.name}-key`, `${u.name}@${server}`, pass, r.location === "app" ? "app" : "ssh")
+        : keys.find((k) => k.id === r.key);
+      if (!key) throw new Error("Schlüssel nicht gefunden");
+      const added = await withSudo(sessionId, (pw) => api.userAuthorizeKey(connId, u.name, key.publicKey, pw));
+
+      let profileNote = "";
+      if (r.profile && host) {
+        await api.hostSave(
+          {
+            ...host,
+            id: "",
+            name: `${host.name} (${u.name})`,
+            username: u.name,
+            auth: { type: "key", keyPath: key.path },
+            tunnels: [],
+            startupCommand: "",
+            hasSecret: false,
+            lastUsed: null,
+          },
+          isNew && pass && r.savePass ? { passphrase: pass } : undefined,
+        );
+        profileNote = `\nHost:        ${host.name} (${u.name}) angelegt`;
+      }
+      await st.reloadVault();
+
+      await ask({
+        title: "Schlüssel eingerichtet",
+        message: added
+          ? `${u.name} kann sich jetzt mit diesem Schlüssel anmelden.`
+          : `Der Schlüssel war bei ${u.name} schon eingetragen.`,
+        detail:
+          `Privat:      ${key.path}\n` +
+          `Öffentlich:  ${key.path}.pub\n` +
+          `Fingerprint: ${key.fingerprint}\n` +
+          `Server:      ~${u.name}/.ssh/authorized_keys${added ? " (neue Zeile)" : ""}` +
+          (isNew ? `\nPassphrase:  ${pass ? "ja" : "nein"}` : "") +
+          profileNote,
+        confirm: "OK",
+        cancel: null,
+      });
+    });
   };
 
   const newGroup = async () => {
@@ -148,6 +242,9 @@ export function Users({ sessionId, connId, visible }: { sessionId: string; connI
                   <div className="row-actions">
                     <button className="btn sm icon ghost" title="Bearbeiten" onClick={() => setEditor(u)}>
                       <Pencil size={13} />
+                    </button>
+                    <button className="btn sm icon ghost" title="SSH-Schlüssel erstellen / eintragen" onClick={() => setupKey(u)}>
+                      <KeySquare size={13} />
                     </button>
                     <button className="btn sm icon ghost" title="Passwort setzen" onClick={() => setPassword(u)}>
                       <KeyRound size={13} />

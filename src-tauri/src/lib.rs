@@ -78,6 +78,7 @@ pub fn run() {
             users::user_lock,
             users::user_update,
             users::group_create,
+            users::user_authorize_key,
             // Schlüssel
             keys::keys_generate,
             keys::keys_import,

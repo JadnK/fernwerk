@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.5 – 2026-11-17
+
+- Benutzer: neue Aktion „SSH-Schlüssel erstellen / eintragen“ – erzeugt ein Ed25519-Schlüsselpaar mit Passphrase und trägt den öffentlichen Schlüssel beim Benutzer in `~/.ssh/authorized_keys` ein (in eigener Zeile; Ordner und Datei werden bei Bedarf mit 700/600 und richtigem Besitzer angelegt)
+- Der private Schlüssel bleibt auf deinem PC – wahlweise in `~/.ssh` oder im Fernwerk-Ordner; auf Wunsch wird direkt ein Host-Eintrag für den Benutzer angelegt
+- Schlüssel erzeugen (Schlüssel-Ansicht): optional mit Passphrase und Speicherort `~/.ssh`
+- Schlüssel verteilen: hängt nicht mehr an die letzte Zeile an, wenn `authorized_keys` ohne Zeilenumbruch endet
+
 ## 1.2.4 – 2026-11-17
 
 - Neues Werkzeug „Sicherheit“ (`Strg+9`): prüft SSH-Konfiguration, Firewall, offene Ports, fail2ban/CrowdSec, Updates, Kernel-Einstellungen und fehlgeschlagene Logins – mit Bewertung und passendem Korrektur-Befehl fürs Terminal; der Check selbst ändert nichts am Server
