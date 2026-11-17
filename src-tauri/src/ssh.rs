@@ -1,7 +1,7 @@
 //! SSH-Verbindungen: Aufbau, Host-Key-Prüfung (TOFU), Exec- und Sudo-Helfer.
 
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -56,6 +56,9 @@ pub struct Connection {
     sudo_nopass: OnceCell<bool>,
     pub terminals: Mutex<HashMap<String, ChannelWriteHalf<Msg>>>,
     pub sftp: Mutex<Option<Arc<SftpSession>>>,
+    /// Zweite SFTP-Session über `sudo sftp-server` für den root-Modus im Datei-Browser
+    pub sftp_root: Mutex<Option<Arc<SftpSession>>>,
+    pub sftp_root_mode: AtomicBool,
     pub stats_prev: Mutex<Option<crate::stats::Sample>>,
     pub cancels: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
@@ -184,6 +187,82 @@ impl Connection {
     /// Verwirft die SFTP-Session, damit sie beim nächsten Zugriff neu aufgebaut wird.
     pub async fn reset_sftp(&self) {
         *self.sftp.lock().await = None;
+        *self.sftp_root.lock().await = None;
+    }
+
+    /// SFTP-Session des Datei-Browsers – im root-Modus die sudo-Session.
+    pub async fn files_sftp(&self) -> AppResult<Arc<SftpSession>> {
+        if !self.sftp_root_mode.load(Ordering::Relaxed) {
+            return self.sftp().await;
+        }
+        if let Some(s) = self.sftp_root.lock().await.as_ref() {
+            return Ok(s.clone());
+        }
+        // Session ist weg (z.B. nach einem Fehler) – ohne Passwort-Abfrage neu aufbauen, wenn möglich
+        self.open_root_sftp(None).await
+    }
+
+    /// Startet den `sftp-server` des Servers über sudo und spricht SFTP über diesen Kanal.
+    /// So laufen alle Dateioperationen mit root-Rechten, ohne dass sich etwas an sshd ändern muss.
+    pub async fn open_root_sftp(
+        &self,
+        sudo_password: Option<String>,
+    ) -> AppResult<Arc<SftpSession>> {
+        let mut guard = self.sftp_root.lock().await;
+        if let Some(s) = guard.as_ref() {
+            return Ok(s.clone());
+        }
+
+        let found = self
+            .exec(
+                "for p in $(cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null \
+                   | awk 'tolower($1)==\"subsystem\" && $2==\"sftp\" {print $3}') \
+                   /usr/lib/openssh/sftp-server /usr/libexec/openssh/sftp-server /usr/lib/ssh/sftp-server \
+                   /usr/libexec/sftp-server /usr/lib/sftp-server /usr/sbin/sftp-server; do \
+                   [ -x \"$p\" ] && { echo \"$p\"; exit 0; }; done; exit 1",
+                None,
+            )
+            .await?;
+        let server = found.stdout.trim().to_string();
+        if !found.ok() || server.is_empty() {
+            return Err(AppError::msg(
+                "sftp-server wurde auf dem Server nicht gefunden (Paket openssh-sftp-server installieren)",
+            ));
+        }
+
+        // Prüft das Passwort und ermittelt, ob sudo ohne Passwort geht
+        self.exec_root("true", sudo_password.clone(), None)
+            .await?
+            .check()?;
+
+        let (cmd, password_line) = if self.username == "root" {
+            (sh_quote(&server), None)
+        } else if self.sudo_nopass.get() == Some(&true) {
+            (format!("sudo -n {}", sh_quote(&server)), None)
+        } else {
+            let pw = sudo_password
+                .filter(|p| !p.is_empty())
+                .or_else(|| self.login_password.clone())
+                .ok_or_else(|| AppError::msg("SUDO_PASSWORD_REQUIRED"))?;
+            // -k: immer nach dem Passwort fragen, damit die Passwortzeile nie beim sftp-server landet
+            (
+                format!("sudo -k -S -p '' {}", sh_quote(&server)),
+                Some(format!("{pw}\n")),
+            )
+        };
+
+        let ch = self.handle.channel_open_session().await?;
+        ch.exec(true, cmd).await?;
+        if let Some(line) = password_line {
+            ch.data(line.as_bytes()).await?;
+        }
+        let session =
+            tokio::time::timeout(Duration::from_secs(15), SftpSession::new(ch.into_stream()))
+                .await
+                .map_err(|_| AppError::msg("sudo-SFTP antwortet nicht"))??;
+        let session = Arc::new(session);
+        *guard = Some(session.clone());
+        Ok(session)
     }
 }
 
@@ -332,6 +411,8 @@ pub async fn ssh_connect(
         sudo_nopass: OnceCell::new(),
         terminals: Mutex::new(HashMap::new()),
         sftp: Mutex::new(None),
+        sftp_root: Mutex::new(None),
+        sftp_root_mode: AtomicBool::new(false),
         stats_prev: Mutex::new(None),
         cancels: std::sync::Mutex::new(HashMap::new()),
     });

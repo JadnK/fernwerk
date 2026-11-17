@@ -14,7 +14,7 @@ use tauri::State;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::error::{AppError, AppResult};
-use crate::ssh::Connection;
+use crate::ssh::{sh_quote, Connection};
 use crate::state::AppState;
 
 const CHUNK: usize = 256 * 1024;
@@ -86,8 +86,50 @@ async fn sftp_of(
     conn_id: &str,
 ) -> AppResult<(Arc<Connection>, Arc<SftpSession>)> {
     let conn = state.conn(conn_id).await?;
-    let s = conn.sftp().await?;
+    let s = conn.files_sftp().await?;
     Ok((conn, s))
+}
+
+/// Schaltet den root-Modus des Datei-Browsers für diese Verbindung ein oder aus.
+#[tauri::command]
+pub async fn sftp_set_root(
+    state: State<'_, AppState>,
+    conn_id: String,
+    enabled: bool,
+    sudo_password: Option<String>,
+) -> AppResult<()> {
+    let conn = state.conn(&conn_id).await?;
+    if enabled {
+        conn.open_root_sftp(sudo_password).await?;
+    } else {
+        *conn.sftp_root.lock().await = None;
+    }
+    conn.sftp_root_mode.store(enabled, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Kopiert per `cp -a` auf dem Server – im root-Modus über sudo.
+#[tauri::command]
+pub async fn sftp_copy(
+    state: State<'_, AppState>,
+    conn_id: String,
+    from: String,
+    to: String,
+    sudo_password: Option<String>,
+) -> AppResult<()> {
+    let conn = state.conn(&conn_id).await?;
+    let (f, t) = (sh_quote(&from), sh_quote(&to));
+    let cmd = format!(
+        "if [ -e {t} ]; then echo 'Ziel existiert bereits' >&2; exit 1; fi; cp -a -- {f} {t}"
+    );
+    let out = if conn.sftp_root_mode.load(Ordering::Relaxed) {
+        conn.exec_root(&cmd, sudo_password, None).await?
+    } else {
+        conn.exec(&format!("sh -c {}", sh_quote(&cmd)), None)
+            .await?
+    };
+    out.check()?;
+    Ok(())
 }
 
 #[tauri::command]

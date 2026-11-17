@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.6 – 2026-11-17
+
+- Dateien: root-Modus (rotes Schild oben) – öffnen, bearbeiten, speichern, herunter- und hochladen, kopieren, umbenennen, löschen und Rechte ändern mit sudo, z.B. in `/root`, `/etc` oder bei Dateien anderer Benutzer
+- Scheitert eine Dateiaktion an fehlenden Rechten, bietet Fernwerk direkt an, sie mit sudo zu wiederholen
+- Dateien behalten beim Speichern als root Besitzer und Rechte; der Home-Button führt auch im root-Modus in dein eigenes Home
+
 ## 1.2.5 – 2026-11-17
 
 - Benutzer: neue Aktion „SSH-Schlüssel erstellen / eintragen“ – erzeugt ein Ed25519-Schlüsselpaar mit Passphrase und trägt den öffentlichen Schlüssel beim Benutzer in `~/.ssh/authorized_keys` ein (in eigener Zeile; Ordner und Datei werden bei Bedarf mit 700/600 und richtigem Besitzer angelegt)

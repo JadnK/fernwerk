@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Scissors,
   Shield,
+  ShieldAlert,
   Trash2,
   Upload,
   X,
@@ -31,7 +32,7 @@ import {
 import { api, errText } from "../lib/api";
 import { bytes, joinPath, parentDir, uid, unixDate } from "../lib/format";
 import { paneNav, type NavDir } from "../lib/nav";
-import { ask, attempt, confirm, run, toast } from "../lib/store";
+import { ask, attempt, confirm, run, toast, withSudo } from "../lib/store";
 import type { FileEntry, Progress } from "../lib/types";
 import { Bar, Modal } from "./ui";
 
@@ -59,7 +60,6 @@ interface DragState {
   copy: boolean;
 }
 
-const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 const baseName = (p: string) => p.replace(/\/+$/, "").split("/").pop() || p;
 
 /** "datei.txt" -> "datei (Kopie).txt" */
@@ -72,6 +72,9 @@ function copyName(name: string): string {
 function isTextTarget(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && !!t.closest("input, textarea, select, [contenteditable]");
 }
+
+/** Fehlende Rechte auf dem Server (SFTP-Status oder Shell-Meldung) */
+const isDenied = (e: unknown) => /permission ?denied|operation not permitted|keine berechtigung/i.test(errText(e));
 
 const TEXT_EXT = /\.(txt|md|conf|cfg|ini|env|json|ya?ml|toml|xml|html?|css|s?js|tsx?|jsx|php|py|rb|go|rs|java|c|h|cpp|sh|bash|zsh|service|log|sql|csv|lua|properties|gitignore|dockerignore)$/i;
 
@@ -94,13 +97,47 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
   const pathRef = useRef<string | null>(null);
   const hist = useRef<{ back: string[]; fwd: string[] }>({ back: [], fwd: [] });
   const [, bumpHist] = useState(0);
+  const [root, setRoot] = useState(false);
+  const rootRef = useRef(false);
+  const failedPath = useRef<string | null>(null);
+  const homeRef = useRef<string | null>(null);
+
+  /** root-Modus: alle Dateizugriffe dieser Verbindung laufen über `sudo sftp-server`. */
+  const setRootMode = async (on: boolean): Promise<boolean> => {
+    const ok = await attempt(() =>
+      on ? withSudo(sessionId, (pw) => api.sftpSetRoot(connId, true, pw)) : api.sftpSetRoot(connId, false),
+    );
+    if (!ok) return false;
+    rootRef.current = on;
+    setRoot(on);
+    toast("ok", on ? "root-Modus an – Dateizugriffe laufen über sudo" : "root-Modus aus");
+    return true;
+  };
+
+  /** Scheitert eine Aktion an fehlenden Rechten, wird angeboten, sie im root-Modus zu wiederholen. */
+  const rootRetry = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (rootRef.current || !isDenied(e)) throw e;
+      const yes = await confirm(
+        "Keine Berechtigung",
+        `${errText(e)} – mit sudo als root erneut versuchen? Der Datei-Browser bleibt dann im root-Modus, bis du ihn über das rote Schild wieder ausschaltest. Neu angelegte Dateien gehören root.`,
+        "Mit sudo erneut versuchen",
+      );
+      if (!yes || !(await setRootMode(true))) throw e;
+      return await fn();
+    }
+  };
+
+  const goHome = () => (homeRef.current ? load(homeRef.current) : api.sftpHome(connId).then(load));
 
   const load = useCallback(
     async (p: string, mode: "push" | "back" | "fwd" = "push") => {
       setLoading(true);
       setError(null);
       try {
-        const list = await api.sftpList(connId, p);
+        const list = await rootRetry(() => api.sftpList(connId, p));
         const cur = pathRef.current;
         if (cur && cur !== p) {
           const h = hist.current;
@@ -117,6 +154,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
         setSelected(new Set());
         lastClicked.current = -1;
       } catch (e) {
+        failedPath.current = p;
         setError(errText(e));
       } finally {
         setLoading(false);
@@ -129,7 +167,10 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     if (!visible || path !== null) return;
     api
       .sftpHome(connId)
-      .then(load)
+      .then((h) => {
+        homeRef.current = h;
+        return load(h);
+      })
       .catch((e) => setError(errText(e)));
   }, [visible, path, connId, load]);
 
@@ -180,13 +221,9 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
       const target = joinPath(destDir, sameDir ? copyName(baseName(p)) : baseName(p));
       try {
         if (mode === "move") {
-          await api.sftpRename(connId, p, target);
+          await rootRetry(() => api.sftpRename(connId, p, target));
         } else {
-          const r = await api.exec(
-            connId,
-            `if [ -e ${q(target)} ]; then echo "Ziel existiert bereits" >&2; exit 1; fi; cp -a -- ${q(p)} ${q(target)}`,
-          );
-          if (r.code !== 0) throw new Error(r.stderr.trim() || `Exit ${r.code}`);
+          await rootRetry(() => withSudo(sessionId, (pw) => api.sftpCopy(connId, p, target, pw)));
         }
         done++;
       } catch (e) {
@@ -297,7 +334,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     if (!path || localPaths.length === 0) return;
     const label = localPaths.length === 1 ? localPaths[0].split(/[\\/]/).pop()! : `${localPaths.length} Elemente`;
     const target = path;
-    await startTransfer("up", label, (id, ch) => api.sftpUpload(connId, localPaths, target, id, ch));
+    await startTransfer("up", label, (id, ch) => rootRetry(() => api.sftpUpload(connId, localPaths, target, id, ch)));
   };
 
   const pickUpload = async (directory: boolean) => {
@@ -311,7 +348,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     const dest = await openDialog({ directory: true, title: "Zielordner wählen" });
     if (!dest || Array.isArray(dest)) return;
     const label = paths.length === 1 ? paths[0].split("/").pop()! : `${paths.length} Elemente`;
-    await startTransfer("down", label, (id, ch) => api.sftpDownload(connId, paths, dest, id, ch));
+    await startTransfer("down", label, (id, ch) => rootRetry(() => api.sftpDownload(connId, paths, dest, id, ch)));
   };
 
   // Drag & Drop aus dem Dateimanager
@@ -343,7 +380,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
 
   const editFile = async (p: string) => {
     try {
-      const content = await api.sftpReadText(connId, p);
+      const content = await rootRetry(() => api.sftpReadText(connId, p));
       setEditor({ path: p, content, original: content });
     } catch (e) {
       toast("error", errText(e));
@@ -353,7 +390,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
   const newFolder = async () => {
     const r = await ask({ title: "Neuer Ordner", fields: [{ name: "name", label: "Name" }], confirm: "Anlegen" });
     if (!r || !path || !String(r.name).trim()) return;
-    await run(() => api.sftpMkdir(connId, joinPath(path, String(r.name).trim())));
+    await run(() => rootRetry(() => api.sftpMkdir(connId, joinPath(path, String(r.name).trim()))));
     refresh();
   };
 
@@ -361,7 +398,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     const r = await ask({ title: "Neue Datei", fields: [{ name: "name", label: "Name" }], confirm: "Anlegen" });
     if (!r || !path || !String(r.name).trim()) return;
     const p = joinPath(path, String(r.name).trim());
-    if (await attempt(() => api.sftpTouch(connId, p))) {
+    if (await attempt(() => rootRetry(() => api.sftpTouch(connId, p)))) {
       refresh();
       setEditor({ path: p, content: "", original: "" });
     }
@@ -372,7 +409,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     if (!r || !path) return;
     const name = String(r.name).trim();
     if (!name || name === e.name) return;
-    await run(() => api.sftpRename(connId, e.path, joinPath(path, name)));
+    await run(() => rootRetry(() => api.sftpRename(connId, e.path, joinPath(path, name))));
     refresh();
   };
 
@@ -386,7 +423,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     if (!r) return;
     const mode = parseInt(String(r.mode), 8);
     if (isNaN(mode) || mode < 0 || mode > 0o7777) return toast("error", "Ungültiger Modus");
-    await run(() => api.sftpChmod(connId, e.path, mode));
+    await run(() => rootRetry(() => api.sftpChmod(connId, e.path, mode)));
     refresh();
   };
 
@@ -401,7 +438,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
       true,
     );
     if (!ok) return;
-    await run(() => api.sftpRemove(connId, paths), "Gelöscht");
+    await run(() => rootRetry(() => api.sftpRemove(connId, paths)), "Gelöscht");
     refresh();
   };
 
@@ -467,7 +504,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
         >
           <ArrowUp size={16} />
         </button>
-        <button className="btn icon ghost" title="Home" onClick={() => api.sftpHome(connId).then(load)}>
+        <button className="btn icon ghost" title="Home" onClick={goHome}>
           <Home size={15} />
         </button>
         {editingPath ? (
@@ -518,6 +555,16 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
         <button className="btn icon ghost" title={showHidden ? "Versteckte ausblenden" : "Versteckte anzeigen"} onClick={() => setShowHidden(!showHidden)}>
           {showHidden ? <Eye size={15} /> : <EyeOff size={15} />}
         </button>
+        <button
+          className={`btn icon ghost ${root ? "root-on" : ""}`}
+          title={root ? "root-Modus beenden" : "root-Modus: Dateien mit sudo öffnen, bearbeiten und herunterladen"}
+          onClick={async () => {
+            if (await setRootMode(!root)) refresh();
+          }}
+        >
+          <ShieldAlert size={15} />
+        </button>
+        {root && <span className="root-chip">root</span>}
         <button className="btn icon ghost" title="Aktualisieren (F5)" onClick={refresh}>
           <RefreshCw size={15} className={loading ? "spin" : ""} />
         </button>
@@ -571,9 +618,21 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
         {error ? (
           <div className="empty">
             <div className="err">{error}</div>
-            <button className="btn" onClick={() => (path ? load(path) : api.sftpHome(connId).then(load))}>
-              Erneut versuchen
-            </button>
+            <div className="row">
+              <button className="btn" onClick={() => (path ? load(path) : goHome())}>
+                Erneut versuchen
+              </button>
+              {!root && /permission ?denied/i.test(error) && (
+                <button
+                  className="btn primary"
+                  onClick={async () => {
+                    if (await setRootMode(true)) load(failedPath.current ?? path ?? "/");
+                  }}
+                >
+                  <ShieldAlert size={14} /> Mit sudo öffnen
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <table className="table">
@@ -702,7 +761,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
           initial={editor.content}
           onClose={() => setEditor(null)}
           onSave={async (content) => {
-            await api.sftpWriteText(connId, editor.path, content);
+            await rootRetry(() => api.sftpWriteText(connId, editor.path, content));
             toast("ok", `${editor.path.split("/").pop()} gespeichert`);
             refresh();
           }}

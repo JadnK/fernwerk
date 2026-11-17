@@ -692,3 +692,21 @@ input[type="range"] { accent-color: var(--accent); }
   background: var(--panel-2); color: var(--muted); font-size: 12px; line-height: 1.5;
 }
 .console-hint b { color: var(--text); font-weight: 600; }
+
+/* Datei-Browser: root-Modus (sudo) */
+.btn.root-on {
+  color: var(--err);
+  border-color: var(--err);
+  background: rgba(201, 85, 62, 0.08);
+}
+.root-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--err);
+  border: 1px solid var(--err);
+  border-radius: var(--r);
+  padding: 1px 6px;
+  white-space: nowrap;
+}

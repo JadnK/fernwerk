@@ -75,6 +75,10 @@ export const api = {
     onProgress: Channel<Progress>,
   ) => invoke<void>("sftp_upload", { connId, localPaths, remoteDir, transferId, onProgress }),
   sftpCancel: (connId: string, transferId: string) => invoke<void>("sftp_cancel", { connId, transferId }),
+  sftpSetRoot: (connId: string, enabled: boolean, sudoPassword?: string) =>
+    invoke<void>("sftp_set_root", { connId, enabled, sudoPassword: sudoPassword ?? null }),
+  sftpCopy: (connId: string, from: string, to: string, sudoPassword?: string) =>
+    invoke<void>("sftp_copy", { connId, from, to, sudoPassword: sudoPassword ?? null }),
 
   // Monitoring
   stats: (connId: string) => invoke<Stats>("stats_fetch", { connId }),

@@ -59,6 +59,8 @@ pub fn run() {
             sftp::sftp_download,
             sftp::sftp_upload,
             sftp::sftp_cancel,
+            sftp::sftp_set_root,
+            sftp::sftp_copy,
             // Monitoring
             stats::stats_fetch,
             stats::process_kill,
