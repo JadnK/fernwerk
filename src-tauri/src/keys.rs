@@ -145,6 +145,24 @@ pub async fn keys_delete(
     v.save()
 }
 
+/// Ändert nur den angezeigten Namen – Datei und Pfad bleiben, Hosts behalten ihre Zuordnung.
+#[tauri::command]
+pub async fn keys_rename(state: State<'_, AppState>, id: String, name: String) -> AppResult<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(AppError::msg("Name darf nicht leer sein"));
+    }
+    let mut v = state.vault.lock().await;
+    let key = v
+        .data
+        .keys
+        .iter_mut()
+        .find(|k| k.id == id)
+        .ok_or_else(|| AppError::msg("Schlüssel nicht gefunden"))?;
+    key.name = name.to_string();
+    v.save()
+}
+
 fn validate_pubkey(line: &str) -> AppResult<()> {
     PublicKey::from_openssh(line.trim())
         .map(|_| ())

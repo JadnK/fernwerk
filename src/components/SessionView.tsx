@@ -10,6 +10,7 @@ import {
   Plus,
   RotateCw,
   Server,
+  ShieldCheck,
   SquareTerminal,
   Users as UsersIcon,
   WifiOff,
@@ -21,6 +22,7 @@ import { Access } from "./Access";
 import { Consoles } from "./Consoles";
 import { FileBrowser } from "./FileBrowser";
 import { Monitor } from "./Monitor";
+import { Security } from "./Security";
 import { Services } from "./Services";
 import { TerminalPane } from "./TerminalPane";
 import { Tunnels } from "./Tunnels";
@@ -35,6 +37,7 @@ export const TOOLS: { id: Tool; label: string; icon: typeof Activity; key: strin
   { id: "tunnels", label: "Tunnel", icon: ArrowRightLeft, key: "5" },
   { id: "users", label: "Benutzer", icon: UsersIcon, key: "6" },
   { id: "access", label: "SSH-Keys", icon: KeyRound, key: "7" },
+  { id: "security", label: "Sicherheit", icon: ShieldCheck, key: "9" },
 ];
 
 export function SessionView({ session, visible }: { session: Session; visible: boolean }) {
@@ -199,6 +202,17 @@ export function SessionView({ session, visible }: { session: Session; visible: b
           {mounted.has("access") && (
             <div className={`pane ${show("access") ? "" : "hidden"}`}>
               <Access connId={session.id} username={session.username} visible={show("access")} />
+            </div>
+          )}
+          {mounted.has("security") && (
+            <div className={`pane ${show("security") ? "" : "hidden"}`}>
+              <Security
+                sessionId={session.id}
+                connId={session.id}
+                hostId={session.hostId}
+                username={session.username}
+                visible={show("security")}
+              />
             </div>
           )}
         </>

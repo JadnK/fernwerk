@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.4 – 2026-11-17
+
+- Neues Werkzeug „Sicherheit“ (`Strg+9`): prüft SSH-Konfiguration, Firewall, offene Ports, fail2ban/CrowdSec, Updates, Kernel-Einstellungen und fehlgeschlagene Logins – mit Bewertung und passendem Korrektur-Befehl fürs Terminal; der Check selbst ändert nichts am Server
+- Einstellungen: Changelog direkt in der App, Links zu GitHub für Fehlermeldungen und Ideen
+- Schlüssel lassen sich umbenennen
+- Host-Editor: Schlüssel werden aus den in Fernwerk angelegten Schlüsseln gewählt
+- Snippets: verständlichere Erklärung der Platzhalter
+
 ## 1.2.3 – 2026-11-16
 
 - Konsolen: Status-Filter oben – Alle, Läuft, Abgestürzt, Beendet mit Anzahl; ein Klick auf eine Raute in der Liste filtert ebenfalls

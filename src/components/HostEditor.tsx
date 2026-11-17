@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, KeyRound, Lock } from "lucide-react";
+import { KeyRound, Lock } from "lucide-react";
 import { api } from "../lib/api";
 import { attempt, confirm, run, useStore } from "../lib/store";
 import type { HostProfile } from "../lib/types";
@@ -39,7 +38,11 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
     () => [...new Set((vault?.hosts ?? []).map((x) => x.group).filter(Boolean))].sort(),
     [vault],
   );
+  const keys = vault?.keys ?? [];
   const keyPath = h.auth.type === "key" ? h.auth.keyPath : "";
+  /** Nur in Fernwerk angelegte Schlüssel sind wählbar – Zuordnung über den gespeicherten Pfad. */
+  const samePath = (a: string, b: string) => a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
+  const selectedKey = keys.find((k) => samePath(k.path, keyPath));
 
   /** "user@host:port" im Host-Feld in die Einzelfelder aufteilen (beim Verlassen des Felds und beim Speichern). */
   const parseQuick = (x: HostProfile): HostProfile => {
@@ -79,12 +82,7 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
     onClose();
   };
 
-  const browseKey = async () => {
-    const p = await openDialog({ title: "Private Key wählen", multiple: false, directory: false });
-    if (typeof p === "string") set("auth", { type: "key", keyPath: p });
-  };
-
-  const valid = h.host.trim() && h.username.trim() && h.port > 0 && (h.auth.type === "password" || keyPath);
+  const valid = h.host.trim() && h.username.trim() && h.port > 0 && (h.auth.type === "password" || selectedKey);
 
   return (
     <Modal
@@ -144,7 +142,7 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
         </button>
         <button
           className={h.auth.type === "key" ? "on" : ""}
-          onClick={() => set("auth", { type: "key", keyPath: vault?.keys[0]?.path ?? "~/.ssh/id_ed25519" })}
+          onClick={() => h.auth.type !== "key" && set("auth", { type: "key", keyPath: keys[0]?.path ?? "" })}
         >
           <KeyRound size={13} /> Schlüssel
         </button>
@@ -156,32 +154,37 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
         </Field>
       ) : (
         <>
-          <Field label="Private Key">
-            <div className="row">
-              {vault && vault.keys.length > 0 && (
-                <select
-                  className="select"
-                  style={{ width: 200 }}
-                  value={vault.keys.find((k) => k.path === keyPath)?.path ?? ""}
-                  onChange={(e) => e.target.value && set("auth", { type: "key", keyPath: e.target.value })}
+          <Field label="Schlüssel">
+            {keys.length === 0 ? (
+              <div className="row">
+                <span className="muted grow">Noch keine Schlüssel angelegt.</span>
+                <button
+                  className="btn sm"
+                  onClick={() => {
+                    onClose();
+                    useStore.getState().setView("keys");
+                  }}
                 >
-                  <option value="">Eigener Pfad…</option>
-                  {vault.keys.map((k) => (
-                    <option key={k.id} value={k.path}>
-                      {k.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <input
-                className="input mono grow"
-                value={keyPath}
-                onChange={(e) => set("auth", { type: "key", keyPath: e.target.value })}
-              />
-              <button className="btn icon" title="Durchsuchen" onClick={browseKey}>
-                <FolderOpen size={14} />
-              </button>
-            </div>
+                  <KeyRound size={12} /> Zu den Schlüsseln
+                </button>
+              </div>
+            ) : (
+              <select
+                className="select"
+                value={selectedKey?.id ?? ""}
+                onChange={(e) => {
+                  const k = keys.find((x) => x.id === e.target.value);
+                  if (k) set("auth", { type: "key", keyPath: k.path });
+                }}
+              >
+                {!selectedKey && <option value="">Schlüssel wählen…</option>}
+                {keys.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
           <Field label={h.hasSecret ? "Passphrase (gespeichert – leer lassen für unverändert)" : "Passphrase (falls verschlüsselt)"}>
             <input className="input" type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} />

@@ -43,7 +43,10 @@ export function Sidebar() {
         { name: "name", label: "Name", value: s?.name ?? "" },
         { name: "command", label: "Befehl", type: "textarea", value: s?.command ?? "", placeholder: "journalctl -u {{dienst:nginx}} -n {{zeilen:50}} --no-pager" },
       ],
-      message: "Platzhalter wie {{name}} oder {{name:Standard}} werden beim Ausführen abgefragt.",
+      message:
+        "Platzhalter sind Lücken im Befehl, die Fernwerk beim Ausführen abfragt. {{name}} = Lücke ohne Vorschlag, {{name:wert}} = Lücke mit vorausgefülltem Wert. Ohne Platzhalter wird der Befehl direkt gesendet.",
+      detail:
+        "Befehl:  journalctl -u {{dienst:nginx}} -n {{zeilen:50}}\nFragt:   dienst [nginx]   zeilen [50]\nSendet:  journalctl -u nginx -n 50",
       confirm: "Speichern",
     });
     if (!r || !String(r.command).trim()) return;
@@ -69,11 +72,6 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <div className="brand-mark">F</div>
-        FERNWERK
-      </div>
-
       <div className="search">
         <Search size={14} />
         <input placeholder="Hosts filtern" value={query} onChange={(e) => setQuery(e.target.value)} />

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { ArrowUpCircle, Download } from "lucide-react";
+import { ArrowUpCircle, Bug, Download, ExternalLink, Lightbulb, MessageSquarePlus, ScrollText } from "lucide-react";
+import changelog from "../../CHANGELOG.md?raw";
 import { errText } from "../lib/api";
 import { bytes } from "../lib/format";
 import { toast, useStore } from "../lib/store";
-import { Bar, Modal } from "./ui";
+import { Bar, Field, Modal } from "./ui";
 
 const SKIP_KEY = "fw-skip-version";
 
@@ -172,14 +174,140 @@ export function UpdateDialog() {
   );
 }
 
-/** Kleine Einstellungs-Sektion: aktuelle Version + manuelle Prüfung. */
+const REPO = "https://github.com/JadnK/fernwerk";
+
+type Release = { version: string; date: string; items: string[] };
+
+/** CHANGELOG.md in Versionen zerlegen: „## 1.2.3 – 2026-11-16“ + Aufzählungspunkte. */
+function parseChangelog(md: string): Release[] {
+  const out: Release[] = [];
+  for (const line of md.split("\n")) {
+    const head = line.match(/^##\s+(\S+)(?:\s+[–-]\s+(.+))?/);
+    if (head) out.push({ version: head[1], date: head[2]?.trim() ?? "", items: [] });
+    else if (out.length && /^\s*[-*] /.test(line)) out[out.length - 1].items.push(line.trim().slice(2).replace(/`/g, ""));
+  }
+  return out;
+}
+
+function ChangelogDialog({ current, onClose }: { current: string | null; onClose: () => void }) {
+  const releases = parseChangelog(changelog);
+  return (
+    <Modal
+      size="wide"
+      title="Releases & Changelog"
+      icon={<ScrollText size={16} style={{ color: "var(--accent)" }} />}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" style={{ marginRight: "auto" }} onClick={() => openUrl(`${REPO}/releases`)}>
+            <ExternalLink size={13} /> Alle Releases auf GitHub
+          </button>
+          <button className="btn" onClick={onClose}>
+            Schließen
+          </button>
+        </>
+      }
+    >
+      <div className="col" style={{ gap: 18, maxHeight: "60vh", overflow: "auto" }}>
+        {releases.map((r) => (
+          <div key={r.version}>
+            <div className="row" style={{ gap: 8 }}>
+              <span className="version-chip" style={r.version === current ? { color: "var(--accent)" } : undefined}>
+                v{r.version}
+              </span>
+              {r.date && <span className="dim">{new Date(r.date).toLocaleDateString("de-DE")}</span>}
+              {r.version === current && <span className="pill ok">installiert</span>}
+            </div>
+            <ul className="update-notes">
+              {r.items.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+/** Öffnet ein vorausgefülltes GitHub-Issue im Browser – abschicken passiert dort mit dem eigenen Konto. */
+function FeedbackDialog({ version, onClose }: { version: string | null; onClose: () => void }) {
+  const [kind, setKind] = useState<"bug" | "idea">("bug");
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
+
+  const submit = async () => {
+    const env = `Fernwerk v${version ?? "?"} · ${navigator.userAgent.match(/\(([^)]+)\)/)?.[1] ?? navigator.platform}`;
+    const body =
+      kind === "bug"
+        ? `## Was ist passiert?\n\n${text}\n\n## Schritte zum Nachstellen\n\n1. \n\n## Erwartet\n\n\n---\n${env}`
+        : `## Idee\n\n${text}\n\n---\n${env}`;
+    const params = new URLSearchParams({
+      title: `${kind === "bug" ? "[Bug]" : "[Idee]"} ${title.trim()}`,
+      body,
+      labels: kind === "bug" ? "bug" : "enhancement",
+    });
+    try {
+      await openUrl(`${REPO}/issues/new?${params}`);
+      onClose();
+    } catch (e) {
+      toast("error", errText(e));
+    }
+  };
+
+  return (
+    <Modal
+      title="Bug melden oder Idee vorschlagen"
+      icon={<MessageSquarePlus size={16} style={{ color: "var(--accent)" }} />}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button className="btn primary" disabled={!title.trim()} onClick={submit}>
+            <ExternalLink size={13} /> Auf GitHub erstellen
+          </button>
+        </>
+      }
+    >
+      <div className="seg" style={{ alignSelf: "flex-start" }}>
+        <button className={kind === "bug" ? "on" : ""} onClick={() => setKind("bug")}>
+          <Bug size={13} /> Bug
+        </button>
+        <button className={kind === "idea" ? "on" : ""} onClick={() => setKind("idea")}>
+          <Lightbulb size={13} /> Idee
+        </button>
+      </div>
+      <Field label="Titel">
+        <input
+          className="input"
+          autoFocus
+          value={title}
+          placeholder={kind === "bug" ? "z.B. Schlüssel lässt sich nicht auswählen" : "z.B. Hosts per Drag & Drop sortieren"}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </Field>
+      <Field label="Beschreibung">
+        <textarea className="textarea" rows={6} value={text} onChange={(e) => setText(e.target.value)} />
+      </Field>
+      <div className="dim" style={{ fontSize: 12 }}>
+        Öffnet GitHub im Browser mit allem vorausgefüllt – dort nur noch auf „Create“ klicken. Version und Betriebssystem werden
+        angehängt, sonst nichts.
+      </div>
+    </Modal>
+  );
+}
+
+/** Einstellungs-Sektion: aktuelle Version, manuelle Prüfung, Changelog und Feedback. */
 export function UpdateSettings() {
   const [version, setVersion] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState<"changelog" | "feedback" | null>(null);
   if (version === null) getVersion().then(setVersion).catch(() => setVersion("?"));
 
   return (
-    <div className="row">
+    <div className="row" style={{ flexWrap: "wrap" }}>
       <span className="muted">
         Installiert: <span className="version-chip">v{version ?? "…"}</span>
       </span>
@@ -194,6 +322,14 @@ export function UpdateSettings() {
       >
         {busy ? "Prüfe…" : "Nach Updates suchen"}
       </button>
+      <button className="btn" onClick={() => setDialog("changelog")}>
+        <ScrollText size={14} /> Changelog
+      </button>
+      <button className="btn" onClick={() => setDialog("feedback")}>
+        <MessageSquarePlus size={14} /> Bug / Idee melden
+      </button>
+      {dialog === "changelog" && <ChangelogDialog current={version} onClose={() => setDialog(null)} />}
+      {dialog === "feedback" && <FeedbackDialog version={version} onClose={() => setDialog(null)} />}
     </div>
   );
 }

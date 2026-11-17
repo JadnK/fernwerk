@@ -1,5 +1,6 @@
 mod error;
 mod keys;
+mod security;
 mod sftp;
 mod ssh;
 mod state;
@@ -18,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             let state = state::AppState::new(&dir).map_err(|e| e.to_string())?;
@@ -80,9 +82,12 @@ pub fn run() {
             keys::keys_generate,
             keys::keys_import,
             keys::keys_delete,
+            keys::keys_rename,
             keys::key_deploy,
             keys::authorized_keys_list,
             keys::authorized_keys_remove,
+            // Sicherheit
+            security::security_audit,
         ])
         .run(tauri::generate_context!())
         .expect("Fernwerk konnte nicht gestartet werden");

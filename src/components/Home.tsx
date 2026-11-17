@@ -33,25 +33,6 @@ export function HomeView() {
         </button>
       </div>
 
-      <div className="stat-strip">
-        <div>
-          <b>{vault.hosts.length}</b>
-          <span>Hosts</span>
-        </div>
-        <div>
-          <b>{live}</b>
-          <span>Verbunden</span>
-        </div>
-        <div>
-          <b>{vault.keys.length}</b>
-          <span>Schlüssel</span>
-        </div>
-        <div>
-          <b>{vault.snippets.length}</b>
-          <span>Snippets</span>
-        </div>
-      </div>
-
       {hosts.length === 0 ? (
         <Empty icon={<Server size={30} />} title="Willkommen bei Fernwerk">
           <div className="muted" style={{ maxWidth: 420 }}>
@@ -158,6 +139,21 @@ export function KeysView() {
     toast("ok", "Schlüssel importiert");
   };
 
+  const rename = async (id: string, name: string) => {
+    const r = await ask({
+      title: "Schlüssel umbenennen",
+      message: "Ändert nur den angezeigten Namen – Datei und Host-Zuordnungen bleiben gleich.",
+      fields: [{ name: "name", label: "Name", value: name }],
+      confirm: "Speichern",
+    });
+    const next = r ? String(r.name).trim() : "";
+    if (!next || next === name) return;
+    await run(async () => {
+      await api.keysRename(id, next);
+      await reloadVault();
+    }, "Schlüssel umbenannt");
+  };
+
   const remove = async (id: string, name: string, path: string) => {
     const r = await ask({
       title: "Schlüssel entfernen",
@@ -205,6 +201,9 @@ export function KeysView() {
               onClick={() => navigator.clipboard.writeText(k.publicKey).then(() => toast("ok", "Public Key kopiert"))}
             >
               <Copy size={13} /> Public Key
+            </button>
+            <button className="btn sm icon ghost" title="Umbenennen" onClick={() => rename(k.id, k.name)}>
+              <Pencil size={13} />
             </button>
             <button className="btn sm icon ghost" title="Entfernen" onClick={() => remove(k.id, k.name, k.path)}>
               <Trash2 size={13} />

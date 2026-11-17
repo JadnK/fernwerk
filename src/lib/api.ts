@@ -127,6 +127,9 @@ export const api = {
   keysImport: (name: string, path: string, passphrase?: string) =>
     invoke<KeyEntry>("keys_import", { name, path, passphrase: passphrase ?? null }),
   keysDelete: (id: string, deleteFile: boolean) => invoke<void>("keys_delete", { id, deleteFile }),
+  keysRename: (id: string, name: string) => invoke<void>("keys_rename", { id, name }),
+  securityAudit: (connId: string, root: boolean, sudoPassword: Sudo) =>
+    invoke<Record<string, string>>("security_audit", { connId, root, sudoPassword: sudoPassword ?? null }),
   keyDeploy: (connId: string, publicKey: string) => invoke<boolean>("key_deploy", { connId, publicKey }),
   authorizedKeys: (connId: string) => invoke<AuthorizedKey[]>("authorized_keys_list", { connId }),
   authorizedKeyRemove: (connId: string, line: string) =>
