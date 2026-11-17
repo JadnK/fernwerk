@@ -710,3 +710,16 @@ input[type="range"] { accent-color: var(--accent); }
   padding: 1px 6px;
   white-space: nowrap;
 }
+.root-toggle {
+  margin-left: auto;
+  margin-right: 8px;
+  gap: 5px;
+}
+.root-toggle + .session-meta {
+  margin-left: 0;
+}
+.term-tab .root-chip {
+  font-size: 9px;
+  padding: 0 4px;
+  margin-right: 2px;
+}

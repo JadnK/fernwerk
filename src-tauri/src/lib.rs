@@ -41,6 +41,7 @@ pub fn run() {
             ssh::ssh_connect,
             ssh::ssh_disconnect,
             ssh::ssh_exec,
+            ssh::ssh_set_root,
             // Terminal
             terminal::term_open,
             terminal::term_write,
@@ -59,7 +60,6 @@ pub fn run() {
             sftp::sftp_download,
             sftp::sftp_upload,
             sftp::sftp_cancel,
-            sftp::sftp_set_root,
             sftp::sftp_copy,
             // Monitoring
             stats::stats_fetch,

@@ -56,9 +56,12 @@ pub struct Connection {
     sudo_nopass: OnceCell<bool>,
     pub terminals: Mutex<HashMap<String, ChannelWriteHalf<Msg>>>,
     pub sftp: Mutex<Option<Arc<SftpSession>>>,
-    /// Zweite SFTP-Session über `sudo sftp-server` für den root-Modus im Datei-Browser
+    /// Zweite SFTP-Session über `sudo sftp-server` für den root-Modus
     pub sftp_root: Mutex<Option<Arc<SftpSession>>>,
-    pub sftp_root_mode: AtomicBool,
+    /// root-Modus der Verbindung: Terminal, Dateien, Konsolen usw. laufen über sudo
+    pub root_mode: AtomicBool,
+    /// sudo-Passwort, das beim Einschalten des root-Modus bestätigt wurde
+    sudo_cache: std::sync::Mutex<Option<String>>,
     pub stats_prev: Mutex<Option<crate::stats::Sample>>,
     pub cancels: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
@@ -136,25 +139,14 @@ impl Connection {
             return self.exec(&format!("sh -c {}", sh_quote(cmd)), stdin).await;
         }
 
-        let nopass = *self
-            .sudo_nopass
-            .get_or_init(|| async {
-                self.exec("sudo -n true", None)
-                    .await
-                    .map(|o| o.ok())
-                    .unwrap_or(false)
-            })
-            .await;
-
-        if nopass {
+        if self.sudo_nopass().await {
             return self
                 .exec(&format!("sudo -n sh -c {}", sh_quote(cmd)), stdin)
                 .await;
         }
 
-        let pw = sudo_password
-            .filter(|p| !p.is_empty())
-            .or_else(|| self.login_password.clone())
+        let pw = self
+            .sudo_password(sudo_password)
             .ok_or_else(|| AppError::msg("SUDO_PASSWORD_REQUIRED"))?;
         let mut input = format!("{pw}\n").into_bytes();
         if let Some(extra) = stdin {
@@ -170,6 +162,61 @@ impl Connection {
             return Err(AppError::msg("SUDO_PASSWORD_WRONG"));
         }
         Ok(out)
+    }
+
+    /// Darf der Benutzer sudo ohne Passwort?
+    async fn sudo_nopass(&self) -> bool {
+        *self
+            .sudo_nopass
+            .get_or_init(|| async {
+                self.exec("sudo -n true", None)
+                    .await
+                    .map(|o| o.ok())
+                    .unwrap_or(false)
+            })
+            .await
+    }
+
+    /// Bekanntes sudo-Passwort: übergeben, beim root-Modus bestätigt oder das Login-Passwort.
+    fn sudo_password(&self, given: Option<String>) -> Option<String> {
+        given
+            .filter(|p| !p.is_empty())
+            .or_else(|| self.sudo_cache.lock().unwrap().clone())
+            .or_else(|| self.login_password.clone())
+    }
+
+    pub fn is_root_mode(&self) -> bool {
+        self.root_mode.load(Ordering::Relaxed)
+    }
+
+    /// Shell-Befehl als aktueller Benutzer bzw. im root-Modus über sudo.
+    /// Läuft in bash, falls vorhanden (wie die normale Login-Shell der meisten Server).
+    pub async fn exec_mode(
+        &self,
+        cmd: &str,
+        sudo_password: Option<String>,
+    ) -> AppResult<ExecOutput> {
+        if !self.is_root_mode() {
+            return self.exec(cmd, None).await;
+        }
+        let q = sh_quote(cmd);
+        self.exec_root(
+            &format!("if command -v bash >/dev/null 2>&1; then exec bash -c {q}; else exec sh -c {q}; fi"),
+            sudo_password,
+            None,
+        )
+        .await
+    }
+
+    /// Befehl für eine root-Shell im Terminal und das Passwort, das Fernwerk beim sudo-Prompt eintippt.
+    pub async fn root_shell(&self) -> (String, Option<String>) {
+        if self.sudo_nopass().await {
+            return ("sudo -i".into(), None);
+        }
+        match self.sudo_password(None) {
+            Some(pw) => (format!("sudo -p {} -i", sh_quote(SUDO_MARKER)), Some(pw)),
+            None => ("sudo -i".into(), None),
+        }
     }
 
     pub async fn sftp(&self) -> AppResult<Arc<SftpSession>> {
@@ -192,7 +239,7 @@ impl Connection {
 
     /// SFTP-Session des Datei-Browsers – im root-Modus die sudo-Session.
     pub async fn files_sftp(&self) -> AppResult<Arc<SftpSession>> {
-        if !self.sftp_root_mode.load(Ordering::Relaxed) {
+        if !self.is_root_mode() {
             return self.sftp().await;
         }
         if let Some(s) = self.sftp_root.lock().await.as_ref() {
@@ -237,12 +284,11 @@ impl Connection {
 
         let (cmd, password_line) = if self.username == "root" {
             (sh_quote(&server), None)
-        } else if self.sudo_nopass.get() == Some(&true) {
+        } else if self.sudo_nopass().await {
             (format!("sudo -n {}", sh_quote(&server)), None)
         } else {
-            let pw = sudo_password
-                .filter(|p| !p.is_empty())
-                .or_else(|| self.login_password.clone())
+            let pw = self
+                .sudo_password(sudo_password)
                 .ok_or_else(|| AppError::msg("SUDO_PASSWORD_REQUIRED"))?;
             // -k: immer nach dem Passwort fragen, damit die Passwortzeile nie beim sftp-server landet
             (
@@ -264,6 +310,33 @@ impl Connection {
         *guard = Some(session.clone());
         Ok(session)
     }
+}
+
+/// Eigener sudo-Prompt in root-Terminals – wird erkannt, ausgeblendet und mit dem Passwort beantwortet.
+pub const SUDO_MARKER: &str = "[fernwerk:sudo]";
+
+/// Schaltet den root-Modus der Verbindung ein oder aus. Beim Einschalten wird sudo geprüft
+/// und ein eingegebenes Passwort für Terminal, Dateien, Konsolen usw. gemerkt.
+#[tauri::command]
+pub async fn ssh_set_root(
+    state: State<'_, AppState>,
+    conn_id: String,
+    enabled: bool,
+    sudo_password: Option<String>,
+) -> AppResult<()> {
+    let conn = state.conn(&conn_id).await?;
+    if enabled {
+        conn.exec_root("true", sudo_password.clone(), None)
+            .await?
+            .check()?;
+        if let Some(pw) = sudo_password.filter(|p| !p.is_empty()) {
+            *conn.sudo_cache.lock().unwrap() = Some(pw);
+        }
+    } else {
+        *conn.sftp_root.lock().await = None;
+    }
+    conn.root_mode.store(enabled, Ordering::Relaxed);
+    Ok(())
 }
 
 /// POSIX-sicheres Quoting für Shell-Argumente.
@@ -412,7 +485,8 @@ pub async fn ssh_connect(
         terminals: Mutex::new(HashMap::new()),
         sftp: Mutex::new(None),
         sftp_root: Mutex::new(None),
-        sftp_root_mode: AtomicBool::new(false),
+        root_mode: AtomicBool::new(false),
+        sudo_cache: std::sync::Mutex::new(None),
         stats_prev: Mutex::new(None),
         cancels: std::sync::Mutex::new(HashMap::new()),
     });
@@ -473,7 +547,7 @@ pub async fn ssh_exec(
     command: String,
 ) -> AppResult<ExecResult> {
     let conn = state.conn(&id).await?;
-    let out = conn.exec(&command, None).await?;
+    let out = conn.exec_mode(&command, None).await?;
     Ok(ExecResult {
         code: out.code,
         stdout: out.stdout,

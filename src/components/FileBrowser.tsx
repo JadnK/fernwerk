@@ -32,7 +32,7 @@ import {
 import { api, errText } from "../lib/api";
 import { bytes, joinPath, parentDir, uid, unixDate } from "../lib/format";
 import { paneNav, type NavDir } from "../lib/nav";
-import { ask, attempt, confirm, run, toast, withSudo } from "../lib/store";
+import { ask, attempt, confirm, run, setRootMode, toast, useStore, withSudo } from "../lib/store";
 import type { FileEntry, Progress } from "../lib/types";
 import { Bar, Modal } from "./ui";
 
@@ -97,21 +97,19 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
   const pathRef = useRef<string | null>(null);
   const hist = useRef<{ back: string[]; fwd: string[] }>({ back: [], fwd: [] });
   const [, bumpHist] = useState(0);
-  const [root, setRoot] = useState(false);
-  const rootRef = useRef(false);
+  // root-Modus gilt für die ganze Verbindung (Schalter oben in der Leiste)
+  const root = useStore((s) => s.sessions.find((x) => x.id === sessionId)?.root ?? false);
+  const rootRef = useRef(root);
+  rootRef.current = root;
+  const retrying = useRef(false);
   const failedPath = useRef<string | null>(null);
   const homeRef = useRef<string | null>(null);
 
-  /** root-Modus: alle Dateizugriffe dieser Verbindung laufen über `sudo sftp-server`. */
-  const setRootMode = async (on: boolean): Promise<boolean> => {
-    const ok = await attempt(() =>
-      on ? withSudo(sessionId, (pw) => api.sftpSetRoot(connId, true, pw)) : api.sftpSetRoot(connId, false),
-    );
-    if (!ok) return false;
-    rootRef.current = on;
-    setRoot(on);
-    toast("ok", on ? "root-Modus an – Dateizugriffe laufen über sudo" : "root-Modus aus");
-    return true;
+  const enableRoot = async () => {
+    retrying.current = true;
+    const ok = await setRootMode(sessionId, true);
+    if (!ok) retrying.current = false;
+    return ok;
   };
 
   /** Scheitert eine Aktion an fehlenden Rechten, wird angeboten, sie im root-Modus zu wiederholen. */
@@ -122,10 +120,10 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
       if (rootRef.current || !isDenied(e)) throw e;
       const yes = await confirm(
         "Keine Berechtigung",
-        `${errText(e)} – mit sudo als root erneut versuchen? Der Datei-Browser bleibt dann im root-Modus, bis du ihn über das rote Schild wieder ausschaltest. Neu angelegte Dateien gehören root.`,
+        `${errText(e)} – mit sudo als root erneut versuchen? Die Verbindung bleibt dann im root-Modus (auch Terminal, Dienste und Konsolen), bis du ihn oben über „root“ ausschaltest. Neu angelegte Dateien gehören root.`,
         "Mit sudo erneut versuchen",
       );
-      if (!yes || !(await setRootMode(true))) throw e;
+      if (!yes || !(await enableRoot())) throw e;
       return await fn();
     }
   };
@@ -133,11 +131,11 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
   const goHome = () => (homeRef.current ? load(homeRef.current) : api.sftpHome(connId).then(load));
 
   const load = useCallback(
-    async (p: string, mode: "push" | "back" | "fwd" = "push") => {
+    async (p: string, mode: "push" | "back" | "fwd" = "push", offerRoot = true) => {
       setLoading(true);
       setError(null);
       try {
-        const list = await rootRetry(() => api.sftpList(connId, p));
+        const list = offerRoot ? await rootRetry(() => api.sftpList(connId, p)) : await api.sftpList(connId, p);
         const cur = pathRef.current;
         if (cur && cur !== p) {
           const h = hist.current;
@@ -173,6 +171,21 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
       })
       .catch((e) => setError(errText(e)));
   }, [visible, path, connId, load]);
+
+  // Beim Umschalten des root-Modus die Liste neu laden (außer die Aktion wird gerade selbst wiederholt)
+  const firstRoot = useRef(true);
+  useEffect(() => {
+    if (firstRoot.current) {
+      firstRoot.current = false;
+      return;
+    }
+    if (retrying.current) {
+      retrying.current = false;
+      return;
+    }
+    // Nach dem Ausschalten nicht sofort wieder fragen – dann zeigt die Liste den Fehler mit „Mit sudo öffnen“
+    if (pathRef.current) load(pathRef.current, "push", false);
+  }, [root, load]);
 
   const shown = useMemo(
     () =>
@@ -555,16 +568,6 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
         <button className="btn icon ghost" title={showHidden ? "Versteckte ausblenden" : "Versteckte anzeigen"} onClick={() => setShowHidden(!showHidden)}>
           {showHidden ? <Eye size={15} /> : <EyeOff size={15} />}
         </button>
-        <button
-          className={`btn icon ghost ${root ? "root-on" : ""}`}
-          title={root ? "root-Modus beenden" : "root-Modus: Dateien mit sudo öffnen, bearbeiten und herunterladen"}
-          onClick={async () => {
-            if (await setRootMode(!root)) refresh();
-          }}
-        >
-          <ShieldAlert size={15} />
-        </button>
-        {root && <span className="root-chip">root</span>}
         <button className="btn icon ghost" title="Aktualisieren (F5)" onClick={refresh}>
           <RefreshCw size={15} className={loading ? "spin" : ""} />
         </button>
@@ -626,7 +629,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
                 <button
                   className="btn primary"
                   onClick={async () => {
-                    if (await setRootMode(true)) load(failedPath.current ?? path ?? "/");
+                    if (await enableRoot()) load(failedPath.current ?? path ?? "/");
                   }}
                 >
                   <ShieldAlert size={14} /> Mit sudo öffnen

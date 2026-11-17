@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.7 – 2026-11-17
+
+- root-Modus gilt jetzt für die ganze Verbindung: Schalter „root“ oben neben Benutzer@Host
+- Terminal: neue Shells starten als root (`sudo -i`), das sudo-Passwort tippt Fernwerk selbst ein; root-Shells sind im Tab markiert
+- Konsolen und Multi-Exec laufen über sudo – tmux-/screen-Sitzungen und Logs von root sind sichtbar und steuerbar
+- Dateien, Dienste, Monitor und Benutzer nutzen das beim Einschalten bestätigte sudo-Passwort ohne erneute Abfrage
+- Beim Ausschalten bleiben offene root-Shells root, neue Shells starten wieder als normaler Benutzer
+
 ## 1.2.6 – 2026-11-17
 
 - Dateien: root-Modus (rotes Schild oben) – öffnen, bearbeiten, speichern, herunter- und hochladen, kopieren, umbenennen, löschen und Rechte ändern mit sudo, z.B. in `/root`, `/etc` oder bei Dateien anderer Benutzer

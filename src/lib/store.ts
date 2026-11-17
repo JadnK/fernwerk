@@ -8,6 +8,8 @@ export interface TermTab {
   title: string;
   /** Wird nach dem Öffnen einmalig ins Terminal geschrieben */
   startup?: string;
+  /** Im root-Modus geöffnet (sudo -i) */
+  root?: boolean;
 }
 
 export interface Session {
@@ -24,6 +26,8 @@ export interface Session {
   /** Zweite, daneben angezeigte Shell (geteilte Ansicht) */
   splitTerm: string | null;
   sudoPassword?: string;
+  /** root-Modus: Terminal (neue Shells), Dateien, Konsolen, Dienste … laufen über sudo */
+  root?: boolean;
 }
 
 export type View = "hosts" | "keys" | "settings";
@@ -178,7 +182,7 @@ export const useStore = create<State>((set, get) => {
   addTerminal: (sessionId, startup) => {
     const s = get().sessions.find((x) => x.id === sessionId);
     if (!s) return;
-    const tab: TermTab = { key: uid(), title: `Shell ${s.terminals.length + 1}`, startup };
+    const tab: TermTab = { key: uid(), title: `Shell ${s.terminals.length + 1}`, startup, root: s.root };
     get().updateSession(sessionId, {
       terminals: [...s.terminals, tab],
       activeTerm: tab.key,
@@ -406,6 +410,22 @@ export async function withSudo<T>(sessionId: string, fn: (pw: string | undefined
     }
   }
   throw new Error("sudo fehlgeschlagen");
+}
+
+/** Schaltet den root-Modus einer Verbindung um. Beim Einschalten wird sudo geprüft (ggf. Passwort-Abfrage). */
+export async function setRootMode(sessionId: string, on: boolean): Promise<boolean> {
+  const ok = await attempt(() =>
+    on ? withSudo(sessionId, (pw) => api.sshSetRoot(sessionId, true, pw)) : api.sshSetRoot(sessionId, false),
+  );
+  if (!ok) return false;
+  useStore.getState().updateSession(sessionId, { root: on });
+  toast(
+    "ok",
+    on
+      ? "root-Modus an – neue Shells, Dateien, Dienste und Konsolen laufen über sudo"
+      : "root-Modus aus – offene root-Shells bleiben root, neue starten normal",
+  );
+  return true;
 }
 
 /** Wie run(), liefert aber true/false – für Aktionen ohne Rückgabewert. */

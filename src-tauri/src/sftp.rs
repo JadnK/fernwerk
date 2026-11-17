@@ -90,24 +90,6 @@ async fn sftp_of(
     Ok((conn, s))
 }
 
-/// Schaltet den root-Modus des Datei-Browsers für diese Verbindung ein oder aus.
-#[tauri::command]
-pub async fn sftp_set_root(
-    state: State<'_, AppState>,
-    conn_id: String,
-    enabled: bool,
-    sudo_password: Option<String>,
-) -> AppResult<()> {
-    let conn = state.conn(&conn_id).await?;
-    if enabled {
-        conn.open_root_sftp(sudo_password).await?;
-    } else {
-        *conn.sftp_root.lock().await = None;
-    }
-    conn.sftp_root_mode.store(enabled, Ordering::Relaxed);
-    Ok(())
-}
-
 /// Kopiert per `cp -a` auf dem Server – im root-Modus über sudo.
 #[tauri::command]
 pub async fn sftp_copy(
@@ -122,7 +104,7 @@ pub async fn sftp_copy(
     let cmd = format!(
         "if [ -e {t} ]; then echo 'Ziel existiert bereits' >&2; exit 1; fi; cp -a -- {f} {t}"
     );
-    let out = if conn.sftp_root_mode.load(Ordering::Relaxed) {
+    let out = if conn.is_root_mode() {
         conn.exec_root(&cmd, sudo_password, None).await?
     } else {
         conn.exec(&format!("sh -c {}", sh_quote(&cmd)), None)

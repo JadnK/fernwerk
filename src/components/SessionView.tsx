@@ -10,13 +10,14 @@ import {
   Plus,
   RotateCw,
   Server,
+  ShieldAlert,
   ShieldCheck,
   SquareTerminal,
   Users as UsersIcon,
   WifiOff,
   X,
 } from "lucide-react";
-import { useStore, type Session } from "../lib/store";
+import { setRootMode, useStore, type Session } from "../lib/store";
 import type { Tool } from "../lib/types";
 import { Access } from "./Access";
 import { Consoles } from "./Consoles";
@@ -71,6 +72,21 @@ export function SessionView({ session, visible }: { session: Session; visible: b
             </button>
           ))}
         </div>
+        <button
+          className={`btn sm ghost root-toggle ${session.root ? "root-on" : ""}`}
+          disabled={closed}
+          title={
+            session.root
+              ? "root-Modus beenden"
+              : "root-Modus: neue Shells, Dateien, Dienste und Konsolen mit sudo als root"
+          }
+          onClick={async () => {
+            const on = !session.root;
+            if ((await setRootMode(session.id, on)) && on && session.tool === "terminal") addTerminal(session.id);
+          }}
+        >
+          <ShieldAlert size={13} /> root
+        </button>
         <span className="session-meta">
           {session.username}@{session.host}
         </span>
@@ -105,6 +121,7 @@ export function SessionView({ session, visible }: { session: Session; visible: b
               onClick={() => focusTerminal(session.id, t.key)}
               onAuxClick={(e) => e.button === 1 && closeTerminal(session.id, t.key)}
             >
+              {t.root && <span className="root-chip">root</span>}
               <span className="ellipsis">{titles[t.key] || t.title}</span>
               <button
                 className="btn sm icon ghost"
