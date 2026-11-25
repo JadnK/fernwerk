@@ -64,6 +64,9 @@ pub struct HostProfile {
     /// Nur für das Frontend: ist ein Passwort/Passphrase hinterlegt?
     #[serde(default)]
     pub has_secret: bool,
+    /// Nur für das Frontend: ist ein sudo-Passwort hinterlegt?
+    #[serde(default)]
+    pub has_sudo_password: bool,
     #[serde(default)]
     pub last_used: Option<i64>,
 }
@@ -95,6 +98,8 @@ pub struct Settings {
     pub cursor_blink: bool,
     pub scrollback: u32,
     pub copy_on_select: bool,
+    /// "tab" = Monitor als eigenes Werkzeug, "bottom" = Statusleiste unten
+    pub monitor_placement: String,
 }
 
 impl Default for Settings {
@@ -105,6 +110,7 @@ impl Default for Settings {
             cursor_blink: true,
             scrollback: 10_000,
             copy_on_select: false,
+            monitor_placement: "tab".into(),
         }
     }
 }
@@ -129,6 +135,8 @@ pub struct VaultData {
 pub struct Secret {
     pub password: Option<String>,
     pub passphrase: Option<String>,
+    #[serde(default)]
+    pub sudo_password: Option<String>,
 }
 
 pub struct Vault {
@@ -167,11 +175,11 @@ impl Vault {
 
     fn refresh_flags(&mut self) {
         for h in &mut self.data.hosts {
-            h.has_secret = self
-                .secrets
-                .get(&h.id)
+            let s = self.secrets.get(&h.id);
+            h.has_secret = s
                 .map(|s| s.password.is_some() || s.passphrase.is_some())
                 .unwrap_or(false);
+            h.has_sudo_password = s.map(|s| s.sudo_password.is_some()).unwrap_or(false);
         }
     }
 
@@ -286,6 +294,7 @@ pub async fn vault_load(state: State<'_, AppState>) -> AppResult<VaultData> {
 pub struct SecretInput {
     pub password: Option<String>,
     pub passphrase: Option<String>,
+    pub sudo_password: Option<String>,
 }
 
 #[tauri::command]
@@ -313,6 +322,9 @@ pub async fn host_save(
         }
         if let Some(p) = s.passphrase {
             entry.passphrase = (!p.is_empty()).then_some(p);
+        }
+        if let Some(p) = s.sudo_password {
+            entry.sudo_password = (!p.is_empty()).then_some(p);
         }
     }
     match v.data.hosts.iter_mut().find(|h| h.id == host.id) {
@@ -399,6 +411,7 @@ pub async fn vault_import(state: State<'_, AppState>, path: String) -> AppResult
             h.id = uuid::Uuid::new_v4().to_string();
         }
         h.has_secret = false;
+        h.has_sudo_password = false;
         v.data.hosts.push(h);
         added += 1;
     }

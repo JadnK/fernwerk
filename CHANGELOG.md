@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.8 – 2026-11-25
+
+- Terminal: Shell-Tab aus dem Fenster ziehen (oder „Fenster“) öffnet die Shell in einem eigenen Fenster – mit Verlauf; per Knopf wieder als Tab zurückholen
+- Dateien | Terminal nebeneinander, Breite per Trenner anpassbar
+- Monitor wahlweise als Statusleiste unten (CPU, RAM, Datenträger, Netzwerk) – Einstellung unter „Sitzung“
+- sudo-Passwort pro Host im Tresor speicherbar – keine Abfrage mehr bei root-Aktionen und im root-Modus
+- Als root angemeldet: wird per UID erkannt, der root-Schalter entfällt dann
+- Übersicht: Doppelklick auf eine Host-Karte verbindet
+
 ## 1.2.7 – 2026-11-17
 
 - root-Modus gilt jetzt für die ganze Verbindung: Schalter „root“ oben neben Benutzer@Host

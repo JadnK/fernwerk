@@ -40,6 +40,21 @@ const THEME = {
 const writers = new Map<string, (text: string) => void>();
 /** termKey -> schreibt nur in die Shell, ohne Fokus (für Broadcast) */
 const rawWriters = new Map<string, (text: string) => void>();
+/** termKey -> ID der Shell im Backend */
+const termIds = new Map<string, string>();
+/** Tabs, deren Shell an ein anderes Fenster übergeben wurde – beim Entfernen nicht schließen */
+const handedOff = new Set<string>();
+
+/**
+ * Gibt die Shell eines Tabs frei, damit ein anderes Fenster sie per term_attach übernimmt.
+ * Danach kann der Tab entfernt werden, ohne die Shell zu beenden.
+ */
+export function releaseTerminal(tabKey: string): string | null {
+  const id = termIds.get(tabKey);
+  if (!id) return null;
+  handedOff.add(tabKey);
+  return id;
+}
 
 export function sendToActiveTerminal(text: string): boolean {
   const { sessions, active } = useStore.getState();
@@ -60,6 +75,7 @@ export function TerminalPane({
   settings,
   onTitle,
   onFocus,
+  onExit,
 }: {
   connId: string;
   tab: TermTab;
@@ -69,7 +85,11 @@ export function TerminalPane({
   settings: Settings;
   onTitle: (title: string) => void;
   onFocus: () => void;
+  /** Shell wurde auf dem Server beendet */
+  onExit?: () => void;
 }) {
+  const onExitRef = useRef(onExit);
+  onExitRef.current = onExit;
   const onFocusRef = useRef(onFocus);
   onFocusRef.current = onFocus;
   const hostRef = useRef<HTMLDivElement>(null);
@@ -188,20 +208,37 @@ export function TerminalPane({
     const channel = new Channel<TermEvent>();
     channel.onmessage = (ev) => {
       if (ev.kind === "data") term.write(b64ToBytes(ev.data));
-      else term.write(`\r\n\x1b[2m[Shell beendet${ev.code != null ? ` – Exit ${ev.code}` : ""}]\x1b[0m\r\n`);
+      else {
+        term.write(`\r\n\x1b[2m[Shell beendet${ev.code != null ? ` – Exit ${ev.code}` : ""}]\x1b[0m\r\n`);
+        onExitRef.current?.();
+      }
     };
 
-    api
-      .termOpen(connId, term.cols, term.rows, channel)
-      .then((id) => {
-        if (disposed) {
-          api.termClose(connId, id);
-          return;
-        }
-        termIdRef.current = id;
-        pending.splice(0).forEach(send);
-        if (tab.startup) send(tab.startup + "\r");
-      })
+    const ready = (id: string) => {
+      termIds.set(tab.key, id);
+      termIdRef.current = id;
+      pending.splice(0).forEach(send);
+    };
+    const opened = tab.attachId
+      ? // Laufende Shell übernehmen: Verlauf kommt über den Channel, danach Größe anpassen
+        api.termAttach(connId, tab.attachId, channel).then(() => {
+          const id = tab.attachId!;
+          if (disposed) {
+            if (!handedOff.has(tab.key)) api.termClose(connId, id);
+            return;
+          }
+          ready(id);
+          api.termResize(connId, id, term.cols, term.rows).catch(() => {});
+        })
+      : api.termOpen(connId, term.cols, term.rows, channel).then((id) => {
+          if (disposed) {
+            api.termClose(connId, id);
+            return;
+          }
+          ready(id);
+          if (tab.startup) send(tab.startup + "\r");
+        });
+    opened
       .catch((e) => term.write(`\x1b[31mTerminal konnte nicht geöffnet werden: ${errText(e)}\x1b[0m\r\n`));
 
     const ro = new ResizeObserver(() => {
@@ -236,7 +273,10 @@ export function TerminalPane({
       ro.disconnect();
       writers.delete(tab.key);
       rawWriters.delete(tab.key);
-      if (termIdRef.current) api.termClose(connId, termIdRef.current);
+      termIds.delete(tab.key);
+      // Ausgelagerte Shells laufen im anderen Fenster weiter
+      if (termIdRef.current && !handedOff.has(tab.key)) api.termClose(connId, termIdRef.current);
+      handedOff.delete(tab.key);
       term.dispose();
     };
     // Terminal wird nur einmal pro Tab erzeugt

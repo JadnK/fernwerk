@@ -1,5 +1,8 @@
 import { createRoot } from "react-dom/client";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
+import { PopoutShell } from "./components/Popout";
+import { POPOUT_PREFIX } from "./lib/popout";
 import "./styles.css";
 
 // Kontextmenü des Browsers außerhalb von Eingabefeldern unterdrücken
@@ -25,4 +28,8 @@ document.addEventListener(
   { passive: true },
 );
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Ausgelagerte Shells laufen in eigenen Fenstern mit eigener, schlanker Oberfläche
+const label = getCurrentWindow().label;
+createRoot(document.getElementById("root")!).render(
+  label.startsWith(POPOUT_PREFIX) ? <PopoutShell label={label} /> : <App />,
+);

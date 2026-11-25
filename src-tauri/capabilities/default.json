@@ -1,9 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Berechtigungen für das Hauptfenster",
+  "description": "Berechtigungen für das Hauptfenster und ausgelagerte Shell-Fenster",
   "windows": [
-    "main"
+    "main",
+    "shell-*"
   ],
   "permissions": [
     "core:default",
@@ -18,6 +19,10 @@
     "process:default",
     "opener:default",
     "clipboard-manager:allow-read-text",
-    "clipboard-manager:allow-write-text"
+    "clipboard-manager:allow-write-text",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-destroy",
+    "core:window:allow-close",
+    "core:window:allow-set-focus"
   ]
 }

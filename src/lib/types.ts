@@ -26,6 +26,7 @@ export interface HostProfile {
   tunnels: TunnelDef[];
   startupCommand: string;
   hasSecret: boolean;
+  hasSudoPassword?: boolean;
   lastUsed: number | null;
 }
 
@@ -50,6 +51,8 @@ export interface Settings {
   cursorBlink: boolean;
   scrollback: number;
   copyOnSelect: boolean;
+  /** Monitor als eigenes Werkzeug oder als Statusleiste unten */
+  monitorPlacement: "tab" | "bottom";
 }
 
 export interface VaultData {
@@ -67,6 +70,7 @@ export interface ConnectInfo {
   username: string;
   fingerprint: string;
   newHostKey: boolean;
+  isRoot: boolean;
 }
 
 export type TermEvent = { kind: "data"; data: string } | { kind: "exit"; code: number | null };

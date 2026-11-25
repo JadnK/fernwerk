@@ -23,7 +23,7 @@ type Sudo = string | undefined;
 export const api = {
   // Vault
   vaultLoad: () => invoke<VaultData>("vault_load"),
-  hostSave: (host: HostProfile, secret?: { password?: string; passphrase?: string }) =>
+  hostSave: (host: HostProfile, secret?: { password?: string; passphrase?: string; sudoPassword?: string }) =>
     invoke<HostProfile>("host_save", { host, secret: secret ?? null }),
   hostDelete: (id: string) => invoke<void>("host_delete", { id }),
   hostForgetKey: (host: string, port: number) => invoke<void>("host_forget_key", { host, port }),
@@ -46,6 +46,8 @@ export const api = {
   // Terminal
   termOpen: (connId: string, cols: number, rows: number, onEvent: Channel<TermEvent>) =>
     invoke<string>("term_open", { connId, cols, rows, onEvent }),
+  termAttach: (connId: string, termId: string, onEvent: Channel<TermEvent>) =>
+    invoke<void>("term_attach", { connId, termId, onEvent }),
   termWrite: (connId: string, termId: string, data: string) =>
     invoke<void>("term_write", { connId, termId, data }),
   termResize: (connId: string, termId: string, cols: number, rows: number) =>

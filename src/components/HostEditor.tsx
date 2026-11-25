@@ -30,6 +30,7 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
   const [h, setH] = useState<HostProfile>(host ?? empty());
   const [password, setPassword] = useState("");
   const [passphrase, setPassphrase] = useState("");
+  const [sudoPw, setSudoPw] = useState("");
   const [clearSecret, setClearSecret] = useState(false);
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof HostProfile>(k: K, v: HostProfile[K]) => setH((x) => ({ ...x, [k]: v }));
@@ -61,9 +62,10 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
     setBusy(true);
     const parsed = parseQuick(h);
     const profile: HostProfile = { ...parsed, name: parsed.name.trim() || parsed.host.trim(), host: parsed.host.trim() };
-    let secret: { password?: string; passphrase?: string } | undefined;
-    if (clearSecret) secret = { password: "", passphrase: "" };
-    else if (password || passphrase) secret = { password: password || undefined, passphrase: passphrase || undefined };
+    let secret: { password?: string; passphrase?: string; sudoPassword?: string } | undefined;
+    if (clearSecret) secret = { password: "", passphrase: "", sudoPassword: "" };
+    else if (password || passphrase || sudoPw)
+      secret = { password: password || undefined, passphrase: passphrase || undefined, sudoPassword: sudoPw || undefined };
     const ok = await attempt(async () => {
       await api.hostSave(profile, secret);
       await reloadVault();
@@ -192,7 +194,19 @@ export function HostEditor({ host, onClose }: { host: HostProfile | null; onClos
         </>
       )}
 
-      {h.hasSecret && (
+      {h.username.trim() !== "root" && (
+        <Field
+          label={
+            h.hasSudoPassword
+              ? "sudo-Passwort (gespeichert – leer lassen für unverändert)"
+              : "sudo-Passwort (optional, sonst Abfrage bei root-Aktionen)"
+          }
+        >
+          <input className="input" type="password" value={sudoPw} onChange={(e) => setSudoPw(e.target.value)} />
+        </Field>
+      )}
+
+      {(h.hasSecret || h.hasSudoPassword) && (
         <label className="check">
           <input type="checkbox" checked={clearSecret} onChange={(e) => setClearSecret(e.target.checked)} />
           Gespeicherte Zugangsdaten entfernen

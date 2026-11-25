@@ -242,3 +242,105 @@ export function Monitor({ sessionId, connId, visible }: { sessionId: string; con
     </div>
   );
 }
+
+/** Kleine Auslastungsanzeige für die Statusleiste */
+function Gauge({ label, value, text, title }: { label: string; value: number | null; text: string; title?: string }) {
+  const v = Math.max(0, Math.min(100, value ?? 0));
+  const cls = v > 90 ? "err" : v > 75 ? "warn" : "";
+  return (
+    <span className="sb-item" title={title}>
+      <span className="sb-label">{label}</span>
+      {value != null && (
+        <span className={`sb-gauge ${cls}`}>
+          <i style={{ width: `${v}%` }} />
+        </span>
+      )}
+      <span className="mono">{text}</span>
+    </span>
+  );
+}
+
+/**
+ * Monitor als Statusleiste unter der Sitzung (Einstellung „Statusleiste unten“).
+ * Sitzt auf einer Linie mit der Fußleiste der Seitenleiste.
+ */
+export function StatusBar({
+  connId,
+  active,
+  open,
+  onToggle,
+}: {
+  connId: string;
+  /** Nur abfragen, solange die Sitzung sichtbar ist */
+  active: boolean;
+  /** Detailansicht (voller Monitor) ist geöffnet */
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Während die Detailansicht offen ist, fragt der Monitor selbst ab
+    if (!active || open) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      try {
+        const s = await api.stats(connId);
+        if (!alive) return;
+        setStats(s);
+        setError(null);
+        timer = setTimeout(tick, s.cpu == null ? 600 : 3000);
+      } catch (e) {
+        if (!alive) return;
+        setError(errText(e));
+        timer = setTimeout(tick, 9000);
+      }
+    };
+    tick();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [active, open, connId]);
+
+  const memPct = stats?.mem.total ? (stats.mem.used / stats.mem.total) * 100 : null;
+  const root = stats?.disks.find((d) => d.mount === "/") ?? stats?.disks[0];
+  const diskPct = root?.size ? (root.used / root.size) * 100 : null;
+
+  return (
+    <div className="statusbar">
+      <button className={`btn ghost sm ${open ? "on" : ""}`} onClick={onToggle} title={open ? "Details schließen" : "Monitor-Details öffnen"}>
+        <Activity size={13} /> {open ? "Details schließen" : "Monitor"}
+      </button>
+      {!stats ? (
+        <span className="dim sb-item">{error ? `Monitoring nicht verfügbar: ${error}` : "Lade Serverdaten…"}</span>
+      ) : (
+        <div className="sb-items">
+          <Gauge label="CPU" value={stats.cpu} text={pct(stats.cpu)} title={`Load ${stats.load.map((l) => l.toFixed(2)).join(" ")} · ${stats.cores} Kerne`} />
+          <Gauge label="RAM" value={memPct} text={`${bytes(stats.mem.used)} / ${bytes(stats.mem.total)}`} />
+          {root && (
+            <Gauge
+              label={root.mount}
+              value={diskPct}
+              text={`${bytes(root.used)} / ${bytes(root.size)}`}
+              title={stats.disks.map((d) => `${d.mount}: ${bytes(d.used)} / ${bytes(d.size)}`).join("\n")}
+            />
+          )}
+          <span className="sb-item mono" title={`gesamt ↓ ${bytes(stats.rxTotal)} · ↑ ${bytes(stats.txTotal)}`}>
+            <span className="ok">↓</span> {rate(stats.rxRate)} <span style={{ color: "var(--accent)" }}>↑</span> {rate(stats.txRate)}
+          </span>
+          <span className="sb-item mono dim" title="Load-Average (1/5/15 Min)">
+            Load {stats.load[0].toFixed(2)}
+          </span>
+          <span className="sb-item mono dim">up {duration(stats.uptime)}</span>
+          <span className="sb-item dim" title={`${stats.os} · Kernel ${stats.kernel}`}>
+            {stats.sessions} Sitzung{stats.sessions === 1 ? "" : "en"}
+          </span>
+          {error && <span className="pill err">{error}</span>}
+        </div>
+      )}
+    </div>
+  );
+}

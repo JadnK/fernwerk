@@ -62,6 +62,12 @@ pub struct Connection {
     pub root_mode: AtomicBool,
     /// sudo-Passwort, das beim Einschalten des root-Modus bestätigt wurde
     sudo_cache: std::sync::Mutex<Option<String>>,
+    /// Im Tresor hinterlegtes sudo-Passwort des Hosts
+    saved_sudo: Option<String>,
+    /// Effektive UID 0 (per `id -u` geprüft, nicht nur am Namen erkannt)
+    pub is_root: AtomicBool,
+    /// Ausgabe-Ziel und Verlauf je Shell – erlaubt das Umhängen in ein anderes Fenster
+    pub term_out: std::sync::Mutex<HashMap<String, crate::terminal::TermOut>>,
     pub stats_prev: Mutex<Option<crate::stats::Sample>>,
     pub cancels: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
@@ -135,7 +141,7 @@ impl Connection {
         sudo_password: Option<String>,
         stdin: Option<&[u8]>,
     ) -> AppResult<ExecOutput> {
-        if self.username == "root" {
+        if self.is_root() {
             return self.exec(&format!("sh -c {}", sh_quote(cmd)), stdin).await;
         }
 
@@ -182,7 +188,13 @@ impl Connection {
         given
             .filter(|p| !p.is_empty())
             .or_else(|| self.sudo_cache.lock().unwrap().clone())
+            .or_else(|| self.saved_sudo.clone())
             .or_else(|| self.login_password.clone())
+    }
+
+    /// Als root (UID 0) angemeldet – dann braucht es kein sudo
+    pub fn is_root(&self) -> bool {
+        self.username == "root" || self.is_root.load(Ordering::Relaxed)
     }
 
     pub fn is_root_mode(&self) -> bool {
@@ -282,7 +294,7 @@ impl Connection {
             .await?
             .check()?;
 
-        let (cmd, password_line) = if self.username == "root" {
+        let (cmd, password_line) = if self.is_root() {
             (sh_quote(&server), None)
         } else if self.sudo_nopass().await {
             (format!("sudo -n {}", sh_quote(&server)), None)
@@ -355,6 +367,7 @@ pub struct ConnectInfo {
     pub username: String,
     pub fingerprint: String,
     pub new_host_key: bool,
+    pub is_root: bool,
 }
 
 async fn connect_profile(
@@ -463,6 +476,7 @@ pub async fn ssh_connect(
     }
 
     let new_host_key = expected.is_none();
+    let saved_sudo = secret.sudo_password.clone();
     let (handle, fingerprint, login_password) = connect_profile(&profile, secret, expected).await?;
 
     {
@@ -487,9 +501,20 @@ pub async fn ssh_connect(
         sftp_root: Mutex::new(None),
         root_mode: AtomicBool::new(false),
         sudo_cache: std::sync::Mutex::new(None),
+        saved_sudo,
+        is_root: AtomicBool::new(profile.username == "root"),
+        term_out: std::sync::Mutex::new(HashMap::new()),
         stats_prev: Mutex::new(None),
         cancels: std::sync::Mutex::new(HashMap::new()),
     });
+    // Tatsächliche UID prüfen – auch Konten mit UID 0, die nicht „root“ heißen
+    if let Ok(out) = conn.exec("id -u", None).await {
+        if out.ok() {
+            conn.is_root
+                .store(out.stdout.trim() == "0", Ordering::Relaxed);
+        }
+    }
+    let is_root = conn.is_root();
     state.conns.write().await.insert(id.clone(), conn.clone());
 
     // Watchdog: meldet dem Frontend, wenn die Verbindung wegbricht.
@@ -516,6 +541,7 @@ pub async fn ssh_connect(
         username: profile.username,
         fingerprint,
         new_host_key,
+        is_root,
     })
 }
 

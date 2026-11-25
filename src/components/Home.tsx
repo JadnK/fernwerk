@@ -48,7 +48,17 @@ export function HomeView() {
           {hosts.map((h) => {
             const s = sessions.find((x) => x.hostId === h.id && x.status === "connected");
             return (
-              <div key={h.id} className="host-card" style={{ ["--card-color" as string]: tone(h.color) }}>
+              <div
+                key={h.id}
+                className="host-card"
+                style={{ ["--card-color" as string]: tone(h.color) }}
+                title="Doppelklick zum Verbinden"
+                onDoubleClick={(e) => {
+                  if ((e.target as HTMLElement).closest("button")) return;
+                  if (s) setActive(s.id);
+                  else connectHost(h.id);
+                }}
+              >
                 <div className="row">
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 600 }} className="ellipsis">
@@ -296,6 +306,22 @@ export function SettingsView() {
           <input type="checkbox" checked={s.copyOnSelect} onChange={(e) => update({ copyOnSelect: e.target.checked })} />
           Markierten Text automatisch kopieren
         </label>
+      </div>
+
+      <div className="section-title">Sitzung</div>
+      <div className="field">
+        <span>Monitor anzeigen</span>
+        <div className="seg" style={{ alignSelf: "flex-start" }}>
+          <button className={s.monitorPlacement !== "bottom" ? "on" : ""} onClick={() => update({ monitorPlacement: "tab" })}>
+            Als Werkzeug-Tab
+          </button>
+          <button className={s.monitorPlacement === "bottom" ? "on" : ""} onClick={() => update({ monitorPlacement: "bottom" })}>
+            Als Statusleiste unten
+          </button>
+        </div>
+      </div>
+      <div className="dim" style={{ fontSize: 12, marginTop: 8 }}>
+        Statusleiste: CPU, RAM, Datenträger und Netzwerk stehen dauerhaft unter jeder Sitzung – ein Klick öffnet die Details.
       </div>
 
       <div className="section-title">Daten</div>

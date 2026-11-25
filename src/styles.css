@@ -723,3 +723,61 @@ input[type="range"] { accent-color: var(--accent); }
   padding: 0 4px;
   margin-right: 2px;
 }
+
+/* ------------------------------------------------------------ Fußleisten-Höhe
+   Seitenleiste (Übersicht / Schlüssel / Einstellungen) und Monitor-Statusleiste
+   liegen auf einer Linie und sind gleich hoch. */
+:root { --foot-h: 37px; }
+.side-foot { height: var(--foot-h); align-items: center; flex-shrink: 0; }
+
+/* ------------------------------------------------------------ Monitor als Statusleiste */
+.statusbar {
+  height: var(--foot-h); flex-shrink: 0;
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 6px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 12px; color: var(--muted);
+  overflow: hidden; white-space: nowrap;
+}
+.sb-items { display: flex; align-items: center; min-width: 0; overflow: hidden; }
+.sb-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 12px; height: 20px;
+  border-left: 1px solid var(--line);
+}
+.sb-items > .sb-item:first-child { border-left: 0; }
+.sb-label { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.sb-gauge { width: 46px; height: 4px; background: var(--line); overflow: hidden; display: inline-block; }
+.sb-gauge > i { display: block; height: 100%; background: var(--accent); transition: width 0.4s ease; }
+.sb-gauge.warn > i { background: var(--warn); }
+.sb-gauge.err > i { background: var(--err); }
+
+/* ------------------------------------------------------------ Dateien | Terminal nebeneinander */
+.panes { flex: 1; min-height: 0; min-width: 0; display: flex; }
+.panes > .pane { min-width: 0; }
+.panes.duo > .pane:not(.hidden) + .pane:not(.hidden) { border-left: 0; }
+.duo-splitter {
+  flex: 0 0 5px; cursor: col-resize;
+  background: var(--bg);
+  border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+  touch-action: none;
+}
+.duo-splitter:hover, .duo-splitter:active { background: var(--accent-lo); }
+
+/* ------------------------------------------------------------ Shell aus dem Fenster ziehen */
+.term-tab { touch-action: none; }
+.term-tab.dragging { cursor: grabbing; opacity: 0.75; }
+.term-tab.dragging.out { border-top-color: var(--accent-hi); color: var(--accent); }
+.drag-hint { color: var(--accent); font-size: 12px; margin-right: 8px; }
+
+.popout { height: 100%; display: flex; flex-direction: column; background: var(--term-bg); }
+.popout-bar {
+  display: flex; align-items: center; gap: 10px;
+  height: 34px; padding: 0 8px 0 14px; flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  position: relative;
+}
+.popout-bar .tab-stripe { background: var(--tab-color, var(--accent)); }
+.popout-bar .session-meta { margin-left: auto; }

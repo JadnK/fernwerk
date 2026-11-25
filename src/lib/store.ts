@@ -10,6 +10,8 @@ export interface TermTab {
   startup?: string;
   /** Im root-Modus geöffnet (sudo -i) */
   root?: boolean;
+  /** Bereits laufende Shell übernehmen (z.B. aus einem ausgelagerten Fenster) statt neu zu öffnen */
+  attachId?: string;
 }
 
 export interface Session {
@@ -25,6 +27,10 @@ export interface Session {
   activeTerm: string | null;
   /** Zweite, daneben angezeigte Shell (geteilte Ansicht) */
   splitTerm: string | null;
+  /** Dateien und Terminal nebeneinander */
+  duo: boolean;
+  /** Effektiv als root (UID 0) angemeldet – root-Modus ist dann überflüssig */
+  isRoot: boolean;
   sudoPassword?: string;
   /** root-Modus: Terminal (neue Shells), Dateien, Konsolen, Dienste … laufen über sudo */
   root?: boolean;
@@ -102,6 +108,8 @@ interface State {
   toggleSplit: (sessionId: string) => void;
   /** Eine Shell in den Vordergrund holen (tauscht bei geteilter Ansicht die Seiten) */
   focusTerminal: (sessionId: string, key: string) => void;
+  /** Eine laufende Shell (z.B. aus einem ausgelagerten Fenster) als Tab übernehmen */
+  adoptTerminal: (sessionId: string, termId: string, title: string, root?: boolean) => void;
   connectHost: (hostId: string) => Promise<void>;
   disconnect: (sessionId: string) => Promise<void>;
   reconnect: (sessionId: string) => Promise<void>;
@@ -224,6 +232,14 @@ export const useStore = create<State>((set, get) => {
     });
   },
 
+  adoptTerminal: (sessionId, termId, title, root) => {
+    const s = get().sessions.find((x) => x.id === sessionId);
+    if (!s) return;
+    const tab: TermTab = { key: uid(), title, attachId: termId, root };
+    get().updateSession(sessionId, { terminals: [...s.terminals, tab], activeTerm: tab.key, tool: "terminal" });
+    withNav(() => set({ active: sessionId }));
+  },
+
   connectHost: async (hostId) => {
     const vault = get().vault;
     const host = vault?.hosts.find((h) => h.id === hostId);
@@ -258,6 +274,8 @@ export const useStore = create<State>((set, get) => {
             terminals: [{ key: uid(), title: "Shell 1", startup: host.startupCommand || undefined }],
             activeTerm: null,
             splitTerm: null,
+            duo: false,
+            isRoot: info.isRoot,
           };
           session.activeTerm = session.terminals[0].key;
           withNav(() => set((s) => ({ sessions: [...s.sessions, session], active: session.id })));
@@ -390,9 +408,13 @@ export function toast(kind: Toast["kind"], text: string) {
 export async function withSudo<T>(sessionId: string, fn: (pw: string | undefined) => Promise<T>): Promise<T> {
   const get = () => useStore.getState().sessions.find((s) => s.id === sessionId);
   let pw = get()?.sudoPassword;
+  let remember = false;
   for (let i = 0; i < 3; i++) {
     try {
-      return await fn(pw);
+      const result = await fn(pw);
+      // Erst nach erfolgreicher Ausführung speichern – sonst landet ein Tippfehler im Tresor
+      if (remember && pw) void saveSudoPassword(get()?.hostId, pw);
+      return result;
     } catch (e) {
       const msg = errText(e);
       if (!msg.includes("SUDO_PASSWORD_REQUIRED") && !msg.includes("SUDO_PASSWORD_WRONG")) throw e;
@@ -401,15 +423,28 @@ export async function withSudo<T>(sessionId: string, fn: (pw: string | undefined
         message: msg.includes("WRONG")
           ? "Falsches Passwort, bitte erneut versuchen."
           : `Für diese Aktion werden root-Rechte auf ${get()?.host ?? "dem Server"} benötigt.`,
-        fields: [{ name: "pw", label: `Passwort für ${get()?.username ?? "Benutzer"}`, type: "password" }],
+        fields: [
+          { name: "pw", label: `Passwort für ${get()?.username ?? "Benutzer"}`, type: "password" },
+          { name: "save", label: "Für diesen Host im Tresor speichern", type: "checkbox", value: remember },
+        ],
         confirm: "Ausführen",
       });
       if (!r) throw new Error("Abgebrochen");
       pw = String(r.pw);
+      remember = !!r.save;
       useStore.getState().updateSession(sessionId, { sudoPassword: pw });
     }
   }
   throw new Error("sudo fehlgeschlagen");
+}
+
+async function saveSudoPassword(hostId: string | undefined, pw: string) {
+  const host = useStore.getState().vault?.hosts.find((h) => h.id === hostId);
+  if (!host) return;
+  await run(async () => {
+    await api.hostSave(host, { sudoPassword: pw });
+    await useStore.getState().reloadVault();
+  }, "sudo-Passwort gespeichert");
 }
 
 /** Schaltet den root-Modus einer Verbindung um. Beim Einschalten wird sudo geprüft (ggf. Passwort-Abfrage). */

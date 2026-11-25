@@ -10,8 +10,9 @@ import { SessionView, TOOLS } from "./components/SessionView";
 import { Sidebar } from "./components/Sidebar";
 import { DialogHost, Toasts } from "./components/ui";
 import { UpdateDialog, checkForUpdates } from "./components/Updater";
-import { errText } from "./lib/api";
+import { api, errText } from "./lib/api";
 import { paneNav, type NavDir } from "./lib/nav";
+import { DOCK_EVENT, type DockPayload } from "./lib/popout";
 import { confirm, toast, useStore } from "./lib/store";
 
 /** Zurück/Vor: erst das aktive Werkzeug (z.B. Ordnerverlauf), dann die App-Historie. */
@@ -45,8 +46,22 @@ export default function App() {
       useStore.getState().updateSession(s.id, { status: "closed" });
       toast("error", `Verbindung zu ${s.label} getrennt`);
     });
+    // Shell aus einem ausgelagerten Fenster zurückholen
+    const unDock = listen<DockPayload>(DOCK_EVENT, (ev) => {
+      const { sessionId, termId, title, root } = ev.payload;
+      const s = useStore.getState().sessions.find((x) => x.id === sessionId);
+      if (!s || s.status !== "connected") {
+        api.termClose(sessionId, termId).catch(() => {});
+        return;
+      }
+      useStore.getState().adoptTerminal(sessionId, termId, title, root);
+      getCurrentWindow()
+        .setFocus()
+        .catch(() => {});
+    });
     return () => {
       un.then((f) => f());
+      unDock.then((f) => f());
     };
   }, []);
 

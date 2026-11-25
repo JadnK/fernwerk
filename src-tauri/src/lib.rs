@@ -26,6 +26,14 @@ pub fn run() {
             app.manage(state);
             Ok(())
         })
+        // Ausgelagerte Shell-Fenster schließen mit dem Hauptfenster
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let tauri::WindowEvent::Destroyed = event {
+                    window.app_handle().exit(0);
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             // Vault
             vault::vault_load,
@@ -44,6 +52,7 @@ pub fn run() {
             ssh::ssh_set_root,
             // Terminal
             terminal::term_open,
+            terminal::term_attach,
             terminal::term_write,
             terminal::term_resize,
             terminal::term_close,
