@@ -33,6 +33,8 @@ import { api, errText } from "../lib/api";
 import { bytes, joinPath, parentDir, uid, unixDate } from "../lib/format";
 import { paneNav, type NavDir } from "../lib/nav";
 import { ask, attempt, confirm, run, setRootMode, toast, useStore, withSudo } from "../lib/store";
+import { listen } from "@tauri-apps/api/event";
+import { FILE_SAVED_EVENT, openEditorWindow, type FileSavedPayload } from "../lib/editwin";
 import type { FileEntry, Progress } from "../lib/types";
 import { Bar, Modal } from "./ui";
 
@@ -391,14 +393,36 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     await editFile(e.path);
   };
 
-  const editFile = async (p: string) => {
+  /** Öffnet die Datei in einem eigenen Editor-Fenster (sonst im eingebauten Editor). */
+  const editFile = async (p: string, known?: string) => {
     try {
-      const content = await rootRetry(() => api.sftpReadText(connId, p));
-      setEditor({ path: p, content, original: content });
+      const content = known ?? (await rootRetry(() => api.sftpReadText(connId, p)));
+      const s = useStore.getState().sessions.find((x) => x.id === sessionId);
+      const ok = await openEditorWindow({
+        connId,
+        path: p,
+        label: s?.label ?? "",
+        host: s ? (s.isRoot ? s.host : `${s.username}@${s.host}`) : "",
+        color: s?.color ?? "",
+        root: !!(s?.root || s?.isRoot),
+        content,
+      });
+      if (!ok) setEditor({ path: p, content, original: content });
     } catch (e) {
       toast("error", errText(e));
     }
   };
+
+  // Im Editor-Fenster gespeichert → Liste (Größe, Datum) aktualisieren
+  useEffect(() => {
+    const un = listen<FileSavedPayload>(FILE_SAVED_EVENT, (ev) => {
+      const { connId: c, path: p } = ev.payload;
+      if (c === connId && pathRef.current && parentDir(p) === pathRef.current) load(pathRef.current, "push", false);
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, [connId, load]);
 
   const newFolder = async () => {
     const r = await ask({ title: "Neuer Ordner", fields: [{ name: "name", label: "Name" }], confirm: "Anlegen" });
@@ -413,7 +437,7 @@ export function FileBrowser({ sessionId, connId, visible }: { sessionId: string;
     const p = joinPath(path, String(r.name).trim());
     if (await attempt(() => rootRetry(() => api.sftpTouch(connId, p)))) {
       refresh();
-      setEditor({ path: p, content: "", original: "" });
+      await editFile(p, "");
     }
   };
 

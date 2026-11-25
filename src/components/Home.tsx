@@ -1,10 +1,24 @@
 import { useState } from "react";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { Copy, Download, FileUp, KeyRound, Network, Pencil, Play, Plus, Server, Trash2 } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Copy,
+  Download,
+  FileUp,
+  FolderTree,
+  KeyRound,
+  Network,
+  Pencil,
+  Play,
+  Plus,
+  Search,
+  Server,
+  Trash2,
+} from "lucide-react";
 import { api, errText } from "../lib/api";
 import { relative, tone, unixDate } from "../lib/format";
 import { ask, confirm, run, toast, useStore } from "../lib/store";
-import type { Settings } from "../lib/types";
+import type { Settings, Tool } from "../lib/types";
 import { Empty, Field } from "./ui";
 import { UpdateSettings } from "./Updater";
 
@@ -12,11 +26,36 @@ export function HomeView() {
   const vault = useStore((s) => s.vault);
   const sessions = useStore((s) => s.sessions);
   const connecting = useStore((s) => s.connecting);
-  const { connectHost, setActive } = useStore.getState();
+  const { connectHost, setActive, setTool } = useStore.getState();
+  const [filter, setFilter] = useState("");
+
+  const connected = sessions.filter((s) => s.status === "connected");
+
   if (!vault) return null;
 
-  const hosts = [...vault.hosts].sort((a, b) => (b.lastUsed ?? 0) - (a.lastUsed ?? 0) || a.name.localeCompare(b.name));
-  const live = sessions.filter((s) => s.status === "connected").length;
+  /** Werkzeug einer Sitzung öffnen – verbindet vorher, falls nötig */
+  const openTool = async (hostId: string, tool: Tool) => {
+    let s = useStore.getState().sessions.find((x) => x.hostId === hostId && x.status === "connected");
+    if (!s) {
+      await connectHost(hostId);
+      s = useStore.getState().sessions.find((x) => x.hostId === hostId && x.status === "connected");
+    }
+    if (!s) return;
+    setActive(s.id);
+    setTool(s.id, tool);
+  };
+
+  const q = filter.trim().toLowerCase();
+  const hosts = [...vault.hosts]
+    .filter((h) => !q || [h.name, h.host, h.username, h.group, ...h.tags].some((v) => v?.toLowerCase().includes(q)))
+    .sort((a, b) => (b.lastUsed ?? 0) - (a.lastUsed ?? 0) || a.name.localeCompare(b.name));
+  const groups = new Map<string, typeof hosts>();
+  for (const h of hosts) {
+    const g = h.group?.trim() || "";
+    groups.set(g, [...(groups.get(g) ?? []), h]);
+  }
+  const groupNames = [...groups.keys()].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+
 
   return (
     <div className="home">
@@ -25,7 +64,12 @@ export function HomeView() {
           <div className="eyebrow">{new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</div>
           <h1>Übersicht</h1>
         </div>
-        <button className="btn" onClick={() => useStore.setState({ multiExec: "" })} disabled={live === 0} title="Einen Befehl auf mehreren verbundenen Hosts ausführen">
+        <button
+          className="btn"
+          onClick={() => useStore.setState({ multiExec: "" })}
+          disabled={connected.length === 0}
+          title="Einen Befehl auf mehreren verbundenen Hosts ausführen"
+        >
           <Network size={14} /> Multi-Exec
         </button>
         <button className="btn primary" onClick={() => useStore.setState({ editingHost: "new" })}>
@@ -33,7 +77,7 @@ export function HomeView() {
         </button>
       </div>
 
-      {hosts.length === 0 ? (
+      {vault.hosts.length === 0 ? (
         <Empty icon={<Server size={30} />} title="Willkommen bei Fernwerk">
           <div className="muted" style={{ maxWidth: 420 }}>
             Lege deinen ersten Server an. Danach hast du Terminal, Dateien, Monitoring, Dienste, Tunnel und Benutzerverwaltung
@@ -44,69 +88,105 @@ export function HomeView() {
           </button>
         </Empty>
       ) : (
-        <div className="home-grid">
-          {hosts.map((h) => {
-            const s = sessions.find((x) => x.hostId === h.id && x.status === "connected");
-            return (
-              <div
-                key={h.id}
-                className="host-card"
-                style={{ ["--card-color" as string]: tone(h.color) }}
-                title="Doppelklick zum Verbinden"
-                onDoubleClick={(e) => {
-                  if ((e.target as HTMLElement).closest("button")) return;
-                  if (s) setActive(s.id);
-                  else connectHost(h.id);
-                }}
-              >
-                <div className="row">
-                  <div className="grow" style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600 }} className="ellipsis">
-                      {h.name}
+        <>
+          <div className="row" style={{ marginTop: 20, alignItems: "center" }}>
+            <div className="section-title grow" style={{ margin: 0 }}>
+              Hosts
+            </div>
+            <div className="dash-search">
+              <Search size={13} className="dim" />
+              <input
+                className="input"
+                placeholder="Name, Adresse, Gruppe oder Tag"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && setFilter("")}
+              />
+            </div>
+          </div>
+
+          {hosts.length === 0 && <div className="muted" style={{ padding: "18px 2px" }}>Kein Host passt zu „{filter}“.</div>}
+
+          {groupNames.map((g) => (
+            <div key={g || "_"}>
+              {groupNames.length > 1 && (
+                <div className="dash-group">
+                  {g || "Ohne Gruppe"} <span className="dim">{groups.get(g)!.length}</span>
+                </div>
+              )}
+              <div className="home-grid" style={{ marginTop: groupNames.length > 1 ? 8 : 12 }}>
+                {groups.get(g)!.map((h) => {
+                  const s = sessions.find((x) => x.hostId === h.id && x.status === "connected");
+                  return (
+                    <div
+                      key={h.id}
+                      className="host-card"
+                      style={{ ["--card-color" as string]: tone(h.color) }}
+                      title="Doppelklick zum Verbinden"
+                      onDoubleClick={(e) => {
+                        if ((e.target as HTMLElement).closest("button")) return;
+                        if (s) setActive(s.id);
+                        else connectHost(h.id);
+                      }}
+                    >
+                      <div className="row">
+                        <div className="grow" style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600 }} className="ellipsis">
+                            {h.name}
+                          </div>
+                          <div className="mono dim ellipsis" style={{ fontSize: 12 }}>
+                            {h.username}@{h.host}
+                            {h.port !== 22 ? `:${h.port}` : ""}
+                          </div>
+                        </div>
+                        {s && (
+                          <span className="pill ok">
+                            <span className="status-dot" /> verbunden
+                          </span>
+                        )}
+                      </div>
+                      <div className="row dim" style={{ fontSize: 12, flexWrap: "wrap", gap: 6 }}>
+                        {h.tags.map((t) => (
+                          <span key={t} className="pill">
+                            {t}
+                          </span>
+                        ))}
+                        {h.auth.type === "key" && (
+                          <span className="pill">
+                            <KeyRound size={10} /> Key
+                          </span>
+                        )}
+                        {h.tunnels.length > 0 && (
+                          <span className="pill">
+                            <ArrowRightLeft size={10} /> {h.tunnels.length}
+                          </span>
+                        )}
+                        <span style={{ marginLeft: "auto" }}>{relative(h.lastUsed)}</span>
+                      </div>
+                      <div className="row">
+                        {s ? (
+                          <button className="btn sm wide" onClick={() => setActive(s.id)}>
+                            Öffnen
+                          </button>
+                        ) : (
+                          <button className="btn sm wide connect" disabled={connecting[h.id]} onClick={() => connectHost(h.id)}>
+                            <Play size={12} /> {connecting[h.id] ? "Verbinde…" : "Verbinden"}
+                          </button>
+                        )}
+                        <button className="btn sm icon" title="Dateien" disabled={connecting[h.id]} onClick={() => openTool(h.id, "files")}>
+                          <FolderTree size={13} />
+                        </button>
+                        <button className="btn sm icon" title="Bearbeiten" onClick={() => useStore.setState({ editingHost: h })}>
+                          <Pencil size={13} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="mono dim ellipsis" style={{ fontSize: 12 }}>
-                      {h.username}@{h.host}
-                      {h.port !== 22 ? `:${h.port}` : ""}
-                    </div>
-                  </div>
-                  {s && (
-                    <span className="pill ok">
-                      <span className="status-dot" /> verbunden
-                    </span>
-                  )}
-                </div>
-                <div className="row dim" style={{ fontSize: 12, flexWrap: "wrap", gap: 6 }}>
-                  {h.group && <span className="pill">{h.group}</span>}
-                  {h.tags.map((t) => (
-                    <span key={t} className="pill">
-                      {t}
-                    </span>
-                  ))}
-                  {h.auth.type === "key" && (
-                    <span className="pill">
-                      <KeyRound size={10} /> Key
-                    </span>
-                  )}
-                  <span style={{ marginLeft: "auto" }}>{relative(h.lastUsed)}</span>
-                </div>
-                <div className="row">
-                  {s ? (
-                    <button className="btn sm wide" onClick={() => setActive(s.id)}>
-                      Öffnen
-                    </button>
-                  ) : (
-                    <button className="btn sm wide connect" disabled={connecting[h.id]} onClick={() => connectHost(h.id)}>
-                      <Play size={12} /> {connecting[h.id] ? "Verbinde…" : "Verbinden"}
-                    </button>
-                  )}
-                  <button className="btn sm icon" title="Bearbeiten" onClick={() => useStore.setState({ editingHost: h })}>
-                    <Pencil size={13} />
-                  </button>
-                </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );

@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Berechtigungen für das Hauptfenster und ausgelagerte Shell-Fenster",
+  "description": "Berechtigungen für das Hauptfenster, ausgelagerte Shells und Editor-Fenster",
   "windows": [
     "main",
-    "shell-*"
+    "shell-*",
+    "edit-*"
   ],
   "permissions": [
     "core:default",
@@ -23,6 +24,7 @@
     "core:webview:allow-create-webview-window",
     "core:window:allow-destroy",
     "core:window:allow-close",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize"
   ]
 }

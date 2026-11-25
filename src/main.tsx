@@ -1,7 +1,9 @@
 import { createRoot } from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
+import { EditorWindow } from "./components/EditorWindow";
 import { PopoutShell } from "./components/Popout";
+import { EDITOR_PREFIX } from "./lib/editwin";
 import { POPOUT_PREFIX } from "./lib/popout";
 import "./styles.css";
 
@@ -28,8 +30,14 @@ document.addEventListener(
   { passive: true },
 );
 
-// Ausgelagerte Shells laufen in eigenen Fenstern mit eigener, schlanker Oberfläche
+// Ausgelagerte Shells und der Datei-Editor laufen in eigenen Fenstern mit eigener, schlanker Oberfläche
 const label = getCurrentWindow().label;
 createRoot(document.getElementById("root")!).render(
-  label.startsWith(POPOUT_PREFIX) ? <PopoutShell label={label} /> : <App />,
+  label.startsWith(POPOUT_PREFIX) ? (
+    <PopoutShell label={label} />
+  ) : label.startsWith(EDITOR_PREFIX) ? (
+    <EditorWindow label={label} />
+  ) : (
+    <App />
+  ),
 );

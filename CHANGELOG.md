@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.9 – 2026-11-25
+
+- Dateien: Textdateien öffnen sich in einem eigenen Editor-Fenster außerhalb des Hauptfensters – mit Zeilennummern, Suche (Strg+F, F3), Zeile/Spalte und „Neu laden“
+- Editor: Strg+S speichert, beim Schließen mit ungespeicherten Änderungen kommt eine Nachfrage; dieselbe Datei öffnet kein zweites Fenster
+- Editor: Dateien mit Windows-Zeilenenden (CRLF) bleiben beim Speichern CRLF
+- Übersicht: Hosts nach Gruppen sortiert, Suchfeld, Dateien-Knopf direkt an jeder Karte; keine grauen Flächen mehr neben den Karten
+
 ## 1.2.8 – 2026-11-25
 
 - Terminal: Shell-Tab aus dem Fenster ziehen (oder „Fenster“) öffnet die Shell in einem eigenen Fenster – mit Verlauf; per Knopf wieder als Tab zurückholen
