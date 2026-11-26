@@ -831,6 +831,22 @@ function FileEditor({
     onClose();
   };
 
+  // Strg+S speichert, solange der Editor offen ist – auch wenn der Fokus nicht im Textfeld liegt
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => {});
+  onKey.current = (e) => {
+    if (!((e.ctrlKey || e.metaKey) && !e.altKey && e.code === "KeyS")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (saving) return;
+    if (dirty) save();
+    else toast("info", "Keine Änderungen – bereits gespeichert");
+  };
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => onKey.current(e);
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
+  }, []);
+
   return (
     <Modal
       size="full"
@@ -873,10 +889,6 @@ function FileEditor({
             e.preventDefault();
             close();
             return;
-          }
-          if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-            e.preventDefault();
-            if (dirty) save();
           }
           if (e.key === "Tab") {
             e.preventDefault();

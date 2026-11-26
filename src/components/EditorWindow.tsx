@@ -165,6 +165,37 @@ export function EditorWindow({ label }: { label: string }) {
     setStatus(null);
   };
 
+  // Tastenkürzel im ganzen Fenster – egal, wo der Fokus gerade ist (Suchfeld, Knopf, Rand …).
+  // Ohne das greift WebView2 bei Strg+S/Strg+F sonst mit eigenen Browser-Funktionen.
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => {});
+  onKey.current = (e) => {
+    const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+    if (mod && e.code === "KeyS") {
+      e.preventDefault();
+      if (content === null || saving || closing) return;
+      if (dirty) save();
+      else setStatus({ kind: "info", text: "Keine Änderungen – bereits gespeichert" });
+      return;
+    }
+    if (mod && e.code === "KeyF") {
+      e.preventDefault();
+      const t = text.current;
+      const sel = t && document.activeElement === t ? t.value.slice(t.selectionStart, t.selectionEnd) : "";
+      setFind(sel && !sel.includes("\n") ? sel : (find ?? ""));
+      requestAnimationFrame(() => findInput.current?.select());
+      return;
+    }
+    if (e.key === "F3") {
+      e.preventDefault();
+      findNext(e.shiftKey);
+    }
+  };
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => onKey.current(e);
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
+  }, []);
+
   const lines = useMemo(() => {
     if (content === null) return 1;
     let n = 1;
@@ -269,24 +300,6 @@ export function EditorWindow({ label }: { label: string }) {
             onKeyUp={updateCursor}
             onClick={updateCursor}
             onKeyDown={(e) => {
-              const mod = e.ctrlKey || e.metaKey;
-              if (mod && e.key.toLowerCase() === "s") {
-                e.preventDefault();
-                if (dirty) save();
-                return;
-              }
-              if (mod && e.key.toLowerCase() === "f") {
-                e.preventDefault();
-                const sel = e.currentTarget.value.slice(e.currentTarget.selectionStart, e.currentTarget.selectionEnd);
-                setFind(sel && !sel.includes("\n") ? sel : (find ?? ""));
-                requestAnimationFrame(() => findInput.current?.select());
-                return;
-              }
-              if (e.key === "F3") {
-                e.preventDefault();
-                findNext(e.shiftKey);
-                return;
-              }
               if (e.key === "Tab") {
                 e.preventDefault();
                 const t = e.currentTarget;

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.10 – 2026-11-26
+
+- Editor: Strg+S speichert jetzt überall im Editor-Fenster – auch wenn der Cursor im Suchfeld oder auf einem Knopf steht
+- Editor: Strg+S ohne Änderungen zeigt „Keine Änderungen – bereits gespeichert“ statt nichts zu tun
+- Strg+F und F3 funktionieren ebenfalls im ganzen Editor-Fenster
+
 ## 1.2.9 – 2026-11-25
 
 - Dateien: Textdateien öffnen sich in einem eigenen Editor-Fenster außerhalb des Hauptfensters – mit Zeilennummern, Suche (Strg+F, F3), Zeile/Spalte und „Neu laden“
